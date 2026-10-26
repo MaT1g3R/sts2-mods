@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Optional machine-local path overrides (gitignored) -->
+  <Import Project="$(MSBuildProjectDirectory)/Sts2Calculator.props.user" Condition="Exists('$(MSBuildProjectDirectory)/Sts2Calculator.props.user')" />
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>Sts2Calculator</AssemblyName>
+    <RootNamespace>Sts2Calculator</RootNamespace>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);MSB3270</NoWarn>
+
+    <!-- Base path to Slay the Spire 2 installation: configurable via STS2_GAME_DIR env variable or Sts2Calculator.props.user -->
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == ''">$(STS2_GAME_DIR)</Sts2GameDir>
+    <!-- Standard Steam installation paths fallback -->
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == '' and Exists('$(HOME)/.steam/steam/steamapps/common/Slay the Spire 2')">$(HOME)/.steam/steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == '' and Exists('$(HOME)/.local/share/Steam/steamapps/common/Slay the Spire 2')">$(HOME)/.local/share/Steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == '' and Exists('$(HOME)/Library/Application Support/Steam/steamapps/common/Slay the Spire 2')">$(HOME)/Library/Application Support/Steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == '' and Exists('C:/Program Files (x86)/Steam/steamapps/common/Slay the Spire 2')">C:/Program Files (x86)/Steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+
+    <Sts2DataDir>$(Sts2GameDir)/data_sts2_linuxbsd_x86_64</Sts2DataDir>
+    <Sts2DataDir Condition="!Exists('$(Sts2DataDir)') and Exists('$(Sts2GameDir)/data_sts2_windows_x86_64')">$(Sts2GameDir)/data_sts2_windows_x86_64</Sts2DataDir>
+    <Sts2DataDir Condition="!Exists('$(Sts2DataDir)') and Exists('$(Sts2GameDir)/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_arm64')">$(Sts2GameDir)/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_arm64</Sts2DataDir>
+    <Sts2DataDir Condition="!Exists('$(Sts2DataDir)') and Exists('$(Sts2GameDir)/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_x86_64')">$(Sts2GameDir)/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_x86_64</Sts2DataDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Tests/**" />
+    <EmbeddedResource Remove="Tests/**" />
+    <None Remove="Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="sts2">
+      <HintPath>$(Sts2DataDir)/sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2DataDir)/GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(Sts2DataDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Auto-deploy target: deploys Sts2Calculator.dll and Sts2Calculator.json on build unless DeployToMods is explicitly false -->
+  <Target Name="DeployToGameMods" AfterTargets="Build" Condition="'$(DeployToMods)' != 'false' and Exists('$(Sts2GameDir)')">
+    <PropertyGroup>
+      <ModInstallDir>$(Sts2GameDir)/mods/$(AssemblyName)</ModInstallDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(ModInstallDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModInstallDir)" />
+    <Copy SourceFiles="$(ProjectDir)$(AssemblyName).json" DestinationFolder="$(ModInstallDir)" Condition="Exists('$(ProjectDir)$(AssemblyName).json')" />
+    <Message Importance="High" Text="Deployed $(AssemblyName) to $(ModInstallDir)" />
+  </Target>
+</Project>

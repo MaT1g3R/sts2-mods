@@ -1,0 +1,11 @@
+{
+  "id": "Sts2Calculator",
+  "name": "Calculator",
+  "author": "vmService",
+  "description": "An in-game calculator accessible from the top menu bar. Supports +, -, *, x, /, parentheses (), and floor()/fl()/int() functions.",
+  "version": "1.0.0",
+  "has_pck": false,
+  "has_dll": true,
+  "dependencies": [],
+  "affects_gameplay": false
+}

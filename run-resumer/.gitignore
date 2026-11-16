@@ -7,3 +7,9 @@ obj/
 .idea/
 *.rrpb
 .DS_Store
+
+# Steam Workshop staged build artifacts
+steam/content/*.dll
+steam/content/*.pdb
+steam/content/*.json
+steam/content/*.pck

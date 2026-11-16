@@ -29,11 +29,14 @@ Set `STS2_GAME_DIR` (or `-p:Sts2GameDir=...`) if the game is not at `$HOME/.stea
 # Build
 dotnet build -c Release
 
-# Run verification tests (Harmony target resolution + 50-floor round-trip & compression)
+# Run verification tests (isolated loader GetTypes + Harmony target resolution + 50-floor round-trip & compression)
 dotnet run --project tests/RunResumer.Tests/RunResumer.Tests.csproj -c Release
 
 # Build and deploy to <game>/mods/RunResumer/
 dotnet build -c Release -p:DeployToMods=true
+
+# Stage (or upload) Steam Workshop release (requires ModUploader on PATH for upload)
+./steam/upload.sh --stage-only
 ```
 
 ## Guidelines & Invariants

@@ -1,0 +1,11 @@
+An in-game calculator accessible from the top menu bar.
+
+Features:
+[list]
+[*] Draggable floating calculator panel with live expression evaluation
+[*] Supports [b]+[/b], [b]-[/b], [b]*[/b], [b]x[/b], [b]/[/b], parentheses [b]( )[/b], unary minus, and [b]floor()[/b], [b]fl()[/b], [b]int()[/b] functions
+[*] Quick damage multiplier shortcuts ([b]x0.75[/b], [b]x1.5[/b], [b]x1.75[/b])
+[*] Collapsible keypad for compact keyboard-only mode and recent calculation history
+[*] Keyboard input guard prevents number keys and game hotkeys from triggering while typing; clicking outside releases focus automatically
+[*] Works in multiplayer even if other players do not have it installed
+[/list]

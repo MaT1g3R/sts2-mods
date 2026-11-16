@@ -264,7 +264,7 @@ public sealed class CalculatorTopBarButton
 		object boxed = tip;
 		AccessTools.Property(typeof(HoverTip), nameof(HoverTip.Title))?.SetValue(boxed, title);
 		AccessTools.Property(typeof(HoverTip), nameof(HoverTip.Description))?.SetValue(boxed, description);
-		AccessTools.Property(typeof(HoverTip), nameof(HoverTip.Id))?.SetValue(boxed, "Sts2Calculator.TopBarTip");
+		AccessTools.Field(typeof(HoverTip), "<Id>k__BackingField")?.SetValue(boxed, "Sts2Calculator.TopBarTip");
 		return (HoverTip)boxed;
 	}
 }

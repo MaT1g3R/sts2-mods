@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Helpers;
@@ -8,6 +9,15 @@ using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using Sts2Calculator.UI;
 
 namespace Sts2Calculator.Patches;
+
+internal static class TopBarPanelRegistry
+{
+	private static readonly ConditionalWeakTable<NTopBar, CalculatorPanel> _panels = new();
+
+	public static void Register(NTopBar topBar, CalculatorPanel panel) => _panels.AddOrUpdate(topBar, panel);
+
+	public static bool TryGet(NTopBar topBar, out CalculatorPanel? panel) => _panels.TryGetValue(topBar, out panel);
+}
 
 /// <summary>
 /// Injects the Calculator TopBar button to the left of the Map and Deck buttons
@@ -36,6 +46,7 @@ public static class TopBarReadyPatch
 
 			var calcButton = new CalculatorTopBarButton();
 			var calcPanel = new CalculatorPanel();
+			TopBarPanelRegistry.Register(__instance, calcPanel);
 
 			// Expand RightAlignedStuff's left offset by 80px so all right-aligned items (Timer, SaveIndicator, Calculator, Map, Deck, Pause) fit cleanly without overlapping
 			rightAlignedStuff.OffsetLeft -= 80f;
@@ -52,6 +63,42 @@ public static class TopBarReadyPatch
 		catch (Exception ex)
 		{
 			Log.Error($"[{Sts2CalculatorEntry.ModId}] Failed to inject Calculator button into NTopBar: {ex}");
+		}
+	}
+}
+
+/// <summary>
+/// Closes the calculator panel when the TopBar animates off-screen (e.g. pause menu or inspecting a teammate in multiplayer).
+/// </summary>
+[HarmonyPatch(typeof(NTopBar), nameof(NTopBar.AnimHide))]
+public static class TopBarAnimHidePatch
+{
+	public static void Postfix(NTopBar __instance)
+	{
+		if (TopBarPanelRegistry.TryGet(__instance, out CalculatorPanel? panel) && panel != null && panel.IsOpen)
+		{
+			panel.SetOpen(false);
+		}
+	}
+}
+
+/// <summary>
+/// Releases focus from the calculator input box when the user clicks outside the calculator panel,
+/// so hotkeys, hand card shortcuts, and the multiplayer reaction wheel resume working immediately.
+/// </summary>
+[HarmonyPatch(typeof(NTopBar), nameof(NTopBar._Input))]
+public static class TopBarInputPatch
+{
+	public static void Postfix(NTopBar __instance, InputEvent inputEvent)
+	{
+		if (inputEvent is InputEventMouseButton { Pressed: true }
+			&& TopBarPanelRegistry.TryGet(__instance, out CalculatorPanel? panel)
+			&& panel != null
+			&& panel.IsOpen
+			&& panel.IsInputEditing()
+			&& !panel.ContainsGlobalMousePosition())
+		{
+			panel.ReleaseInputFocus();
 		}
 	}
 }

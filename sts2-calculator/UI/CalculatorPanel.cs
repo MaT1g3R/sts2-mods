@@ -351,6 +351,41 @@ public sealed class CalculatorPanel
 		return false;
 	}
 
+	/// <summary>
+	/// Returns true if the calculator's input box currently has focus or is actively editing.
+	/// </summary>
+	public bool IsInputEditing()
+	{
+		return GodotObject.IsInstanceValid(_inputEdit) && (_inputEdit.IsEditing() || _inputEdit.HasFocus());
+	}
+
+	/// <summary>
+	/// Returns true if the current mouse position lies within the calculator panel bounds.
+	/// </summary>
+	public bool ContainsGlobalMousePosition()
+	{
+		return GodotObject.IsInstanceValid(Root) && Root.GetGlobalRect().HasPoint(Root.GetGlobalMousePosition());
+	}
+
+	/// <summary>
+	/// Exits editing and releases GUI focus from the calculator input box while keeping the panel open.
+	/// </summary>
+	public void ReleaseInputFocus()
+	{
+		if (!GodotObject.IsInstanceValid(_inputEdit))
+		{
+			return;
+		}
+		if (_inputEdit.IsEditing())
+		{
+			_inputEdit.Unedit();
+		}
+		if (_inputEdit.HasFocus())
+		{
+			_inputEdit.ReleaseFocus();
+		}
+	}
+
 	public void Toggle(Control anchorButton)
 	{
 		SetOpen(!Root.Visible, anchorButton);
@@ -399,11 +434,7 @@ public sealed class CalculatorPanel
 		}
 		else
 		{
-			if (_inputEdit.HasFocus())
-			{
-				_inputEdit.Unedit();
-				_inputEdit.ReleaseFocus();
-			}
+			ReleaseInputFocus();
 		}
 	}
 

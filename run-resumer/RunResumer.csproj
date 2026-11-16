@@ -6,13 +6,17 @@
     <Nullable>enable</Nullable>
     <LangVersion>12.0</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefaultItemExcludes>$(DefaultItemExcludes);src/RunResumer.Core/**;tests/**</DefaultItemExcludes>
     <!-- Override with -p:Sts2GameDir=... or the STS2_GAME_DIR environment variable. -->
     <Sts2GameDir Condition="'$(Sts2GameDir)' == ''">$(STS2_GAME_DIR)</Sts2GameDir>
     <Sts2GameDir Condition="'$(Sts2GameDir)' == ''">$(HOME)/.steam/steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
     <Sts2DataDir>$(Sts2GameDir)/data_sts2_linuxbsd_x86_64</Sts2DataDir>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src/RunResumer.Loader/**/*.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <Reference Include="sts2">
@@ -30,24 +34,28 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Google.Protobuf" Version="3.30.2" />
-    <PackageReference Include="Grpc.Tools" Version="2.71.0" PrivateAssets="All" />
+    <ProjectReference Include="src/RunResumer.Core/RunResumer.Core.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="false" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Protobuf Include="Protos/run_archive.proto" GrpcServices="None" />
-  </ItemGroup>
+  <PropertyGroup>
+    <CoreOutDir>$(ProjectDir)src/RunResumer.Core/bin/$(Configuration)/net9.0/</CoreOutDir>
+  </PropertyGroup>
+
+  <Target Name="CopySidecarsToOutput" AfterTargets="Build">
+    <Copy SourceFiles="$(CoreOutDir)RunResumer.Core.dll;$(CoreOutDir)Google.Protobuf.dll"
+          DestinationFolder="$(OutputPath)" />
+  </Target>
 
   <!-- dotnet build -c Release -p:DeployToMods=true -->
-  <Target Name="DeployToMods" AfterTargets="Build" Condition="'$(DeployToMods)' == 'true'">
+  <Target Name="DeployToMods" AfterTargets="CopySidecarsToOutput" Condition="'$(DeployToMods)' == 'true'">
     <PropertyGroup>
       <ModDestDir>$(Sts2GameDir)/mods/$(AssemblyName)</ModDestDir>
     </PropertyGroup>
     <MakeDir Directories="$(ModDestDir)" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDestDir)" />
-    <Copy SourceFiles="$(OutputPath)Google.Protobuf.dll"
-          DestinationFolder="$(ModDestDir)"
-          Condition="Exists('$(OutputPath)Google.Protobuf.dll')" />
+    <Copy SourceFiles="$(TargetPath);$(OutputPath)RunResumer.Core.dll;$(OutputPath)Google.Protobuf.dll"
+          DestinationFolder="$(ModDestDir)" />
     <Copy SourceFiles="$(ProjectDir)$(AssemblyName).json"
           DestinationFolder="$(ModDestDir)"
           Condition="Exists('$(ProjectDir)$(AssemblyName).json')" />

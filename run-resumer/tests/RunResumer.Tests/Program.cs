@@ -4,11 +4,13 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Runtime.Loader;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Entities.Rngs;
 using MegaCrit.Sts2.Core.Map;
+using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Platform;
 using MegaCrit.Sts2.Core.Rooms;
@@ -28,15 +30,57 @@ internal static class Program
 {
     public static int Main()
     {
+        TestLoaderIsolatedGetTypes();
         TestHarmonyPatchTargetsResolve();
         TestRoundTripAndCompression();
         Console.WriteLine("ALL TESTS PASSED");
         return 0;
     }
 
+    private sealed class IsolatedModLoadContext : AssemblyLoadContext
+    {
+        public IsolatedModLoadContext() : base(isCollectible: true) { }
+        protected override Assembly? Load(AssemblyName assemblyName) => null;
+    }
+
+    private static void TestLoaderIsolatedGetTypes()
+    {
+        string? repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+        string loaderOutDir = Path.Combine(repoRoot, "bin", "Release", "net9.0");
+        string loaderDll = Path.Combine(loaderOutDir, "RunResumer.dll");
+        Assert(File.Exists(loaderDll), $"Expected {loaderDll} to exist");
+        Assert(File.Exists(Path.Combine(loaderOutDir, "RunResumer.Core.dll")), "Expected RunResumer.Core.dll in loader output");
+        Assert(File.Exists(Path.Combine(loaderOutDir, "Google.Protobuf.dll")), "Expected Google.Protobuf.dll in loader output");
+
+        // Verify RunResumer.dll has zero static reference to Google.Protobuf or RunResumer.Core
+        IsolatedModLoadContext alc = new IsolatedModLoadContext();
+        Assembly loaded = alc.LoadFromAssemblyPath(loaderDll);
+        string[] referenced = loaded.GetReferencedAssemblies().Select(a => a.Name ?? "").ToArray();
+        Assert(!referenced.Contains("Google.Protobuf"), "RunResumer.dll must not statically reference Google.Protobuf");
+        Assert(!referenced.Contains("RunResumer.Core"), "RunResumer.dll must not statically reference RunResumer.Core");
+
+        // Simulates ModManager.TryLoadMod calling GetTypes() before any initializer runs
+        Type[] types = loaded.GetTypes();
+        Type? entryType = types.FirstOrDefault(t => t.GetCustomAttribute<ModInitializerAttribute>() != null);
+        Assert(entryType != null, "ModInitializerAttribute not found on RunResumer.dll");
+
+        // Hook resolver (as RunResumerEntry.Initialize does) and load RunResumer.Core.dll inside the same ALC
+        alc.Resolving += (_, name) =>
+        {
+            string candidate = Path.Combine(loaderOutDir, name.Name + ".dll");
+            return File.Exists(candidate) ? alc.LoadFromAssemblyPath(candidate) : null;
+        };
+        Assembly coreLoaded = alc.LoadFromAssemblyPath(Path.Combine(loaderOutDir, "RunResumer.Core.dll"));
+        Type[] coreTypes = coreLoaded.GetTypes();
+        Assert(coreTypes.Any(t => t.Name == "RunArchive"), "RunArchive type missing from RunResumer.Core.dll");
+        alc.Unload();
+
+        Console.WriteLine("[PASS] Verified RunResumer.dll loads cleanly via ModManager.GetTypes() + isolated AssemblyLoadContext");
+    }
+
     private static void TestHarmonyPatchTargetsResolve()
     {
-        Assembly modAssembly = typeof(RunResumerEntry).Assembly;
+        Assembly modAssembly = typeof(RunResumerCoreEntry).Assembly;
         int checkedPatches = 0;
 
         foreach (Type type in modAssembly.GetTypes())

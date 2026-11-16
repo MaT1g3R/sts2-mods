@@ -11,7 +11,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../RunResumer.csproj" />
+    <ProjectReference Include="../../src/RunResumer.Core/RunResumer.Core.csproj" />
+    <ProjectReference Include="../../RunResumer.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="Google.Protobuf" Version="3.30.2" />
     <Reference Include="sts2">
       <HintPath>$(Sts2DataDir)/sts2.dll</HintPath>

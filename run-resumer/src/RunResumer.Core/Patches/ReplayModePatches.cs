@@ -108,13 +108,6 @@ internal static class LoadMainMenuPatch
 [HarmonyPatch(typeof(NMainMenu), nameof(NMainMenu._Ready))]
 internal static class MainMenuReadyReturnPatch
 {
-    private static readonly AccessTools.FieldRef<NRunHistory, List<string>> RunNamesRef =
-        AccessTools.FieldRefAccess<NRunHistory, List<string>>("_runNames");
-
-    private static readonly Func<NRunHistory, int, Task> RefreshAndSelectRunDelegate =
-        AccessTools.MethodDelegate<Func<NRunHistory, int, Task>>(
-            AccessTools.Method(typeof(NRunHistory), "RefreshAndSelectRun", new[] { typeof(int) }));
-
     public static void Postfix(NMainMenu __instance)
     {
         long? pendingStartTime = ReplaySession.PendingReturnStartTime;
@@ -137,12 +130,7 @@ internal static class MainMenuReadyReturnPatch
 
                 __instance.OpenCompendiumSubmenu();
                 NRunHistory historyScreen = __instance.SubmenuStack.PushSubmenuType<NRunHistory>();
-                List<string> runNames = RunNamesRef(historyScreen);
-                int index = runNames.IndexOf($"{targetStartTime}.run");
-                if (index > 0)
-                {
-                    TaskHelper.RunSafely(RefreshAndSelectRunDelegate(historyScreen, index));
-                }
+                RunHistoryShareUiHelper.SelectRunInHistory(historyScreen, targetStartTime);
             }
             catch (Exception ex)
             {

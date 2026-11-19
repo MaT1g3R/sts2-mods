@@ -66,34 +66,135 @@ internal static class RunArchiveStorage
         }
 
         int profileId = SaveManager.Instance.CurrentProfileId;
-        long startTime = history.StartTime;
-
         lock (_sync)
         {
-            if (_floorIndexCache.TryGetValue((profileId, startTime), out HashSet<int>? cached))
-            {
-                return cached.Contains(floorNum);
-            }
+            return GetOrLoadFloorIndexLocked(profileId, history.StartTime).Contains(floorNum);
+        }
+    }
 
-            string path = GetArchiveOsPath(startTime);
+    public static bool HasAnyFloor(RunHistory? history)
+    {
+        if (TestMode.IsOn || history == null || history.Players.Count != 1)
+        {
+            return false;
+        }
+
+        int profileId = SaveManager.Instance.CurrentProfileId;
+        lock (_sync)
+        {
+            return GetOrLoadFloorIndexLocked(profileId, history.StartTime).Count > 0;
+        }
+    }
+
+    public static bool TryReadArchive(long startTime, out RunArchive? archive)
+    {
+        archive = null;
+        if (TestMode.IsOn)
+        {
+            return false;
+        }
+
+        string path = GetArchiveOsPath(startTime);
+        lock (_sync)
+        {
             if (!File.Exists(path))
             {
-                _floorIndexCache[(profileId, startTime)] = new HashSet<int>();
                 return false;
             }
 
             try
             {
-                RunArchive archive = RunArchiveCodec.DeserializeCompressed(File.ReadAllBytes(path));
-                HashSet<int> floors = UpdateFloorIndexCacheLocked(profileId, archive);
-                return floors.Contains(floorNum);
+                archive = RunArchiveCodec.DeserializeCompressed(File.ReadAllBytes(path));
+                return true;
             }
             catch (Exception ex)
             {
-                Log.Warn($"[RunResumer] Failed to index archive {path}: {ex.Message}");
-                _floorIndexCache[(profileId, startTime)] = new HashSet<int>();
+                Log.Warn($"[RunResumer] Failed to read archive {path}: {ex.Message}");
                 return false;
             }
+        }
+    }
+
+    public static bool DoesArchiveExist(long startTime)
+    {
+        if (TestMode.IsOn)
+        {
+            return false;
+        }
+
+        lock (_sync)
+        {
+            return File.Exists(GetArchiveOsPath(startTime));
+        }
+    }
+
+    public static void WriteImportedArchive(RunArchive archive)
+    {
+        if (TestMode.IsOn)
+        {
+            return;
+        }
+
+        int profileId = SaveManager.Instance.CurrentProfileId;
+        string path = GetArchiveOsPath(archive.StartTime);
+        byte[] compressed = RunArchiveCodec.SerializeCompressed(archive);
+
+        lock (_sync)
+        {
+            WriteAtomic(path, compressed);
+            UpdateFloorIndexCacheLocked(profileId, archive);
+        }
+    }
+
+    public static void DeleteArchiveIfExists(long startTime)
+    {
+        if (TestMode.IsOn)
+        {
+            return;
+        }
+
+        int profileId = SaveManager.Instance.CurrentProfileId;
+        string path = GetArchiveOsPath(startTime);
+        lock (_sync)
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+            _floorIndexCache.Remove((profileId, startTime));
+            if (_activeArchive is { startTime: var activeStart } && activeStart == startTime)
+            {
+                _activeArchive = null;
+            }
+        }
+    }
+
+    private static HashSet<int> GetOrLoadFloorIndexLocked(int profileId, long startTime)
+    {
+        if (_floorIndexCache.TryGetValue((profileId, startTime), out HashSet<int>? cached))
+        {
+            return cached;
+        }
+
+        string path = GetArchiveOsPath(startTime);
+        if (!File.Exists(path))
+        {
+            HashSet<int> empty = new HashSet<int>();
+            _floorIndexCache[(profileId, startTime)] = empty;
+            return empty;
+        }
+
+        try
+        {
+            RunArchive archive = RunArchiveCodec.DeserializeCompressed(File.ReadAllBytes(path));
+            return UpdateFloorIndexCacheLocked(profileId, archive);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"[RunResumer] Failed to index archive {path}: {ex.Message}");
+            HashSet<int> empty = new HashSet<int>();
+            _floorIndexCache[(profileId, startTime)] = empty;
+            return empty;
         }
     }
 

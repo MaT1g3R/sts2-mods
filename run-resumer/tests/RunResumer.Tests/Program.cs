@@ -33,6 +33,7 @@ internal static class Program
         TestLoaderIsolatedGetTypes();
         TestHarmonyPatchTargetsResolve();
         TestRoundTripAndCompression();
+        TestShareExportImportAndValidation();
         Console.WriteLine("ALL TESTS PASSED");
         return 0;
     }
@@ -120,7 +121,7 @@ internal static class Program
             checkedPatches++;
         }
 
-        Assert(checkedPatches == 15, $"Expected 15 patch classes, checked {checkedPatches}");
+        Assert(checkedPatches == 18, $"Expected 18 patch classes, checked {checkedPatches}");
         Console.WriteLine($"[PASS] Verified all {checkedPatches} Harmony patch targets resolve against sts2.dll");
     }
 
@@ -214,6 +215,149 @@ internal static class Program
         Console.WriteLine(
             $"[PASS] 50-floor round-trip exact JSON match! Raw JSON total={totalRawJsonBytes:N0} bytes, " +
             $"Compressed Protobuf={compressed.Length:N0} bytes ({ratio:F2}% of raw, {sw.ElapsedMilliseconds} ms round-trip)");
+    }
+
+    private static void TestShareExportImportAndValidation()
+    {
+        List<List<MapPointHistoryEntry>> fullMapPointHistory = new()
+        {
+            new List<MapPointHistoryEntry>(),
+            new List<MapPointHistoryEntry>(),
+            new List<MapPointHistoryEntry>()
+        };
+
+        List<SerializableRun> floors = new();
+        for (int floor = 1; floor <= 5; floor++)
+        {
+            SerializableRun run = BuildFloorRun(floor, 0, fullMapPointHistory);
+            floors.Add(run);
+            fullMapPointHistory[0].Add(new MapPointHistoryEntry
+            {
+                MapPointType = MapPointType.Monster,
+                Rooms = new List<MapPointRoomHistoryEntry>
+                {
+                    new MapPointRoomHistoryEntry
+                    {
+                        RoomType = RoomType.Monster,
+                        ModelId = new ModelId("ENCOUNTER", "SLIMES_SMALL")
+                    }
+                },
+                PlayerStats = new List<PlayerMapPointHistoryEntry>
+                {
+                    new PlayerMapPointHistoryEntry
+                    {
+                        PlayerId = 1uL,
+                        CurrentHp = 70,
+                        MaxHp = 80,
+                        CurrentGold = 99 + floor * 10
+                    }
+                }
+            });
+        }
+
+        RunArchive archive = RunArchiveCodec.CreateNewArchive(floors[0]);
+        for (int i = 0; i < floors.Count; i++)
+        {
+            RunArchiveCodec.UpsertFloor(archive, floors[i], i + 1);
+        }
+
+        RunHistory history = new RunHistory
+        {
+            SchemaVersion = 11,
+            StartTime = floors[0].StartTime,
+            Seed = "TESTSEED123",
+            Ascension = 10,
+            BuildId = "v0.113.1",
+            Players = new List<RunHistoryPlayer>
+            {
+                new RunHistoryPlayer
+                {
+                    Id = 1uL,
+                    Character = new ModelId("CHARACTER", "IRONCLAD")
+                }
+            },
+            MapPointHistory = fullMapPointHistory
+        };
+
+        byte[] shareBytes = RunShareService.CreateShareBytes(history, archive);
+
+        ShareImportPayload parsed = RunShareService.ValidateAndParseShare(
+            shareBytes,
+            expectedRunSchemaVersion: floors[0].SchemaVersion,
+            maxHistorySchemaVersion: 11,
+            isModelKnown: _ => true);
+
+        Assert(parsed.FloorCount == 5, $"Expected 5 floors in parsed share, got {parsed.FloorCount}");
+        Assert(parsed.History.StartTime == history.StartTime, "Parsed history StartTime mismatch");
+        Assert(parsed.Archive.StartTime == archive.StartTime, "Parsed archive StartTime mismatch");
+
+        for (int floor = 1; floor <= 5; floor++)
+        {
+            string expectedJson = JsonSerializationUtility.ToJson(floors[floor - 1]);
+            string actualJson = JsonSerializationUtility.ToJson(
+                RunArchiveCodec.ReconstructRun(parsed.Archive, floor, parsed.History));
+            Assert(string.Equals(expectedJson, actualJson, StringComparison.Ordinal), $"Share round-trip mismatch on floor {floor}");
+        }
+
+        // Verify StartTime collision resolution updates both RunHistory and RunArchive cleanly.
+        long collidedStartTime = RunShareService.ResolveUniqueStartTime(
+            parsed.History.StartTime,
+            candidate => candidate == history.StartTime || candidate == history.StartTime + 1);
+        Assert(collidedStartTime == history.StartTime + 2, $"Expected StartTime+2 on collision, got {collidedStartTime}");
+
+        RunHistory renamedHistory = RunShareService.ApplyStartTime(parsed.RawRunJson, parsed.Archive, collidedStartTime);
+        Assert(renamedHistory.StartTime == collidedStartTime, "Renamed RunHistory StartTime mismatch");
+        Assert(parsed.Archive.StartTime == collidedStartTime, "Renamed RunArchive StartTime mismatch");
+        SerializableRun renamedReconstructed = RunArchiveCodec.ReconstructRun(parsed.Archive, 3, renamedHistory);
+        Assert(renamedReconstructed.StartTime == collidedStartTime, "Reconstructed run StartTime mismatch after collision rename");
+
+        // Verify missing ModelId rejection.
+        ExpectShareRejection(
+            () => RunShareService.ValidateAndParseShare(
+                shareBytes,
+                expectedRunSchemaVersion: floors[0].SchemaVersion,
+                maxHistorySchemaVersion: 11,
+                isModelKnown: id => id.Entry != "REWARD_CARD_10"),
+            "missing content");
+
+        // Verify schema mismatch rejection.
+        ExpectShareRejection(
+            () => RunShareService.ValidateAndParseShare(
+                shareBytes,
+                expectedRunSchemaVersion: floors[0].SchemaVersion + 1,
+                maxHistorySchemaVersion: 11,
+                isModelKnown: _ => true),
+            "schema");
+
+        // Verify corrupt archive rejection.
+        ExpectShareRejection(
+            () => RunShareService.ValidateAndParseShare(
+                new byte[] { 1, 2, 3, 4 },
+                expectedRunSchemaVersion: floors[0].SchemaVersion,
+                maxHistorySchemaVersion: 11,
+                isModelKnown: _ => true),
+            "corrupted");
+
+        string defaultFileName = RunShareService.BuildDefaultFileName(history);
+        Assert(defaultFileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase), $"Expected .zip default filename, got {defaultFileName}");
+
+        Console.WriteLine("[PASS] Verified .zip export/import round-trip, collision handling, and validation rejections");
+    }
+
+    private static void ExpectShareRejection(Action action, string expectedSubstring)
+    {
+        try
+        {
+            action();
+        }
+        catch (RunShareValidationException ex)
+        {
+            Assert(
+                ex.Message.Contains(expectedSubstring, StringComparison.OrdinalIgnoreCase),
+                $"Expected rejection message containing '{expectedSubstring}', got: {ex.Message}");
+            return;
+        }
+        throw new Exception($"Expected RunShareValidationException containing '{expectedSubstring}', but no exception was thrown");
     }
 
     private static SerializableRun BuildFloorRun(

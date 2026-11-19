@@ -37,6 +37,9 @@ dotnet build -c Release -p:DeployToMods=true
 
 # Stage (or upload) Steam Workshop release (requires ModUploader on PATH for upload)
 ./steam/upload.sh --stage-only
+
+# Build, test, and package distributable zip (dist/RunResumer-v<version>.zip)
+./scripts/package.sh
 ```
 
 ## Guidelines & Invariants

@@ -73,6 +73,14 @@ internal static class Program
         Assembly coreLoaded = alc.LoadFromAssemblyPath(Path.Combine(loaderOutDir, "RunResumer.Core.dll"));
         Type[] coreTypes = coreLoaded.GetTypes();
         Assert(coreTypes.Any(t => t.Name == "RunArchive"), "RunArchive type missing from RunResumer.Core.dll");
+        using (Stream? iconStream = coreLoaded.GetManifestResourceStream("RunResumer.Assets.run_resumer_icon.png"))
+        {
+            Assert(iconStream != null, "Embedded icon resource RunResumer.Assets.run_resumer_icon.png missing from RunResumer.Core.dll");
+            byte[] header = new byte[4];
+            int read = iconStream!.Read(header, 0, 4);
+            Assert(read == 4 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47,
+                "Embedded icon resource is not a valid PNG");
+        }
         alc.Unload();
 
         Console.WriteLine("[PASS] Verified RunResumer.dll loads cleanly via ModManager.GetTypes() + isolated AssemblyLoadContext");
@@ -112,7 +120,7 @@ internal static class Program
             checkedPatches++;
         }
 
-        Assert(checkedPatches == 12, $"Expected 12 patch classes, checked {checkedPatches}");
+        Assert(checkedPatches == 14, $"Expected 14 patch classes, checked {checkedPatches}");
         Console.WriteLine($"[PASS] Verified all {checkedPatches} Harmony patch targets resolve against sts2.dll");
     }
 

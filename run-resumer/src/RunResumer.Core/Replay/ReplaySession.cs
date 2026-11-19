@@ -23,6 +23,8 @@ internal static class ReplaySession
 
     public static long? ReplayedRunStartTime { get; private set; }
 
+    public static int? ReplayedFromFloor { get; private set; }
+
     public static long? PendingReturnStartTime { get; set; }
 
     public static void TryLaunchFromHistory(RunHistory history, int floorNum)
@@ -66,6 +68,7 @@ internal static class ReplaySession
             PendingReturnStartTime = ReplayedRunStartTime;
             IsActive = false;
             ReplayedRunStartTime = null;
+            ReplayedFromFloor = null;
         }
     }
 
@@ -73,6 +76,7 @@ internal static class ReplaySession
     {
         IsActive = false;
         ReplayedRunStartTime = null;
+        ReplayedFromFloor = null;
         PendingReturnStartTime = null;
         _isLaunching = false;
     }
@@ -109,6 +113,7 @@ internal static class ReplaySession
 
             IsActive = true;
             ReplayedRunStartTime = runStartTime;
+            ReplayedFromFloor = floorNum;
             PendingReturnStartTime = null;
 
             await RunManager.Instance.SetUpSavedSingleplayer(runState, serializableRun);
@@ -122,6 +127,7 @@ internal static class ReplaySession
             Log.Error($"[RunResumer] Exception while launching replay for run {runStartTime} Floor {floorNum}: {ex}");
             IsActive = false;
             ReplayedRunStartTime = null;
+            ReplayedFromFloor = null;
             RunManager.Instance.CleanUp();
             await game.ReturnToMainMenuWithInternalError(ex);
         }

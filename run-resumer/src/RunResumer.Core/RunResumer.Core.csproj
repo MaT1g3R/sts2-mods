@@ -35,4 +35,10 @@
   <ItemGroup>
     <Protobuf Include="Protos/run_archive.proto" GrpcServices="None" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/run_resumer_icon.png">
+      <LogicalName>RunResumer.Assets.run_resumer_icon.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
 </Project>

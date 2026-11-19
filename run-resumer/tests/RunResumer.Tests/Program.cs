@@ -122,6 +122,11 @@ internal static class Program
         }
 
         Assert(checkedPatches == 18, $"Expected 18 patch classes, checked {checkedPatches}");
+        Assert(AccessTools.Field(typeof(SaveManager), "_saveStore") != null, "SaveManager._saveStore missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_history") != null, "NRunHistory._history missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_runNames") != null, "NRunHistory._runNames missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_index") != null, "NRunHistory._index missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NSubmenu), "_stack") != null, "NSubmenu._stack missing");
         Console.WriteLine($"[PASS] Verified all {checkedPatches} Harmony patch targets resolve against sts2.dll");
     }
 
@@ -305,11 +310,32 @@ internal static class Program
             candidate => candidate == history.StartTime || candidate == history.StartTime + 1);
         Assert(collidedStartTime == history.StartTime + 2, $"Expected StartTime+2 on collision, got {collidedStartTime}");
 
+        Assert(!archive.IsImported, "Locally created archive should not be marked imported");
+
         RunHistory renamedHistory = RunShareService.ApplyStartTime(parsed.RawRunJson, parsed.Archive, collidedStartTime);
         Assert(renamedHistory.StartTime == collidedStartTime, "Renamed RunHistory StartTime mismatch");
         Assert(parsed.Archive.StartTime == collidedStartTime, "Renamed RunArchive StartTime mismatch");
         SerializableRun renamedReconstructed = RunArchiveCodec.ReconstructRun(parsed.Archive, 3, renamedHistory);
         Assert(renamedReconstructed.StartTime == collidedStartTime, "Reconstructed run StartTime mismatch after collision rename");
+
+        // Verify imported marker persistence through compression and export cleanup.
+        parsed.Archive.IsImported = true;
+        RunArchive roundTrippedImported = RunArchiveCodec.DeserializeCompressed(
+            RunArchiveCodec.SerializeCompressed(parsed.Archive));
+        Assert(roundTrippedImported.IsImported, "IsImported flag did not persist through archive serialization");
+
+        byte[] reExportBytes = RunShareService.CreateShareBytes(renamedHistory, roundTrippedImported);
+        ShareImportPayload reExportParsed = RunShareService.ValidateAndParseShare(
+            reExportBytes,
+            expectedRunSchemaVersion: floors[0].SchemaVersion,
+            maxHistorySchemaVersion: 11,
+            isModelKnown: _ => true);
+        Assert(!reExportParsed.Archive.IsImported, "Exported zip should clear IsImported before packaging");
+
+        RunShareService.EnsureCanDeleteImportedRun(isImported: true);
+        ExpectShareRejection(
+            () => RunShareService.EnsureCanDeleteImportedRun(isImported: false),
+            "only imported runs");
 
         // Verify missing ModelId rejection.
         ExpectShareRejection(

@@ -38,6 +38,7 @@ message RunArchive {
   repeated PbPotionList potions_pool = 25;
 
   repeated PbFloorSnapshot floors = 26;
+  bool is_imported = 27;
 }
 
 message PbFloorSnapshot {

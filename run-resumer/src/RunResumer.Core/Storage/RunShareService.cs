@@ -6,10 +6,12 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using HarmonyLib;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Runs.History;
 using MegaCrit.Sts2.Core.Saves;
+using MegaCrit.Sts2.Core.Saves.Managers;
 using MegaCrit.Sts2.Core.Saves.Runs;
 using RunResumer.Proto;
 
@@ -43,6 +45,9 @@ internal static class RunShareService
     private const string HistoryEntryName = "history.run";
     private const string ArchiveEntryName = "archive.rrpb";
     private const long MaxEntryBytes = 32L * 1024 * 1024;
+
+    private static readonly AccessTools.FieldRef<SaveManager, ISaveStore> SaveStoreRef =
+        AccessTools.FieldRefAccess<SaveManager, ISaveStore>("_saveStore");
 
     public static string BuildDefaultFileName(RunHistory history)
     {
@@ -98,7 +103,13 @@ internal static class RunShareService
         }
 
         string historyJson = rawRunJson ?? JsonSerializationUtility.ToJson(history);
-        byte[] archiveBytes = RunArchiveCodec.SerializeCompressed(archive);
+        RunArchive exportArchive = archive;
+        if (exportArchive.IsImported)
+        {
+            exportArchive = exportArchive.Clone();
+            exportArchive.IsImported = false;
+        }
+        byte[] archiveBytes = RunArchiveCodec.SerializeCompressed(exportArchive);
 
         JsonObject manifest = new JsonObject
         {
@@ -155,6 +166,7 @@ internal static class RunShareService
             historyToSave = ApplyStartTime(payload.RawRunJson, archiveToSave, targetStartTime);
         }
 
+        archiveToSave.IsImported = true;
         RunArchiveStorage.WriteImportedArchive(archiveToSave);
         try
         {
@@ -176,6 +188,35 @@ internal static class RunShareService
             targetStartTime != originalStartTime,
             payload.FloorCount,
             historyToSave.Players[0].Character.Entry);
+    }
+
+    public static void EnsureCanDeleteImportedRun(bool isImported)
+    {
+        if (!isImported)
+        {
+            throw new RunShareValidationException("Only imported runs can be deleted.");
+        }
+    }
+
+    public static void DeleteImportedRun(long startTime)
+    {
+        EnsureCanDeleteImportedRun(RunArchiveStorage.IsImported(startTime));
+
+        string fileName = $"{startTime}.run";
+        string historyPath = Path.Combine(
+            RunHistorySaveManager.GetHistoryPath(SaveManager.Instance.CurrentProfileId),
+            fileName);
+
+        ISaveStore saveStore = SaveStoreRef(SaveManager.Instance);
+        saveStore.DeleteFile(historyPath);
+        saveStore.DeleteFile(historyPath + ".backup");
+
+        if (SaveManager.Instance.GetAllRunHistoryNames().Contains(fileName))
+        {
+            throw new RunShareValidationException("Failed to delete imported run history file.");
+        }
+
+        RunArchiveStorage.DeleteArchiveIfExists(startTime);
     }
 
     public static ShareImportPayload ValidateAndParseShare(

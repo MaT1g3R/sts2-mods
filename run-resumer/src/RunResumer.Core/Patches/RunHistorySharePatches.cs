@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.addons.mega_text;
@@ -15,6 +16,7 @@ using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Multiplayer;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
@@ -28,22 +30,31 @@ internal static class RunHistoryShareUiHelper
 {
     private const string ShareButtonScenePath = "res://scenes/ui/share_button.tscn";
     private const string HoverTipTable = "static_hover_tips";
+    private const string MainMenuUiTable = "main_menu_ui";
+    private const string DeleteTipTitleKey = "RUN_RESUMER_DELETE.title";
     private const string ExportTipTitleKey = "RUN_RESUMER_EXPORT.title";
     private const string ImportTipTitleKey = "RUN_RESUMER_IMPORT.title";
+    private const string DeletePopupHeaderKey = "RUN_RESUMER_DELETE.header";
+    private const string DeletePopupBodyKey = "RUN_RESUMER_DELETE.body";
 
     private static readonly Color DisabledLabelModulate = new(1f, 1f, 1f, 0.45f);
     private static readonly Color RestButtonPillColor = new(0f, 0f, 0f, 0.753f);
     private static readonly Color HoverButtonPillColor = new(0.18f, 0.32f, 0.38f, 0.94f);
     private static readonly Color PressButtonPillColor = new(0.10f, 0.18f, 0.22f, 0.90f);
+    private static readonly Color HoverDeletePillColor = new(0.45f, 0.14f, 0.14f, 0.94f);
+    private static readonly Color PressDeletePillColor = new(0.28f, 0.08f, 0.08f, 0.90f);
     private static readonly Color ButtonShadowColor = new(0f, 0f, 0f, 0.38f);
     private static readonly Vector2 HoverScale = new(1.06f, 1.06f);
     private static readonly Vector2 PressScale = new(0.96f, 0.96f);
 
     private sealed class ShareUiState
     {
+        public required NButton DeleteButton;
+        public required Control DeleteLabelContainer;
         public required NButton ExportButton;
         public required Control ExportLabelContainer;
         public required NButton ImportButton;
+        public string DeleteTipDescription = string.Empty;
         public string ExportTipDescription = string.Empty;
     }
 
@@ -55,8 +66,14 @@ internal static class RunHistoryShareUiHelper
     private static readonly AccessTools.FieldRef<NRunHistory, List<string>> RunNamesRef =
         AccessTools.FieldRefAccess<NRunHistory, List<string>>("_runNames");
 
-    private static readonly Func<NRunHistory, int, System.Threading.Tasks.Task> RefreshAndSelectRunDelegate =
-        AccessTools.MethodDelegate<Func<NRunHistory, int, System.Threading.Tasks.Task>>(
+    private static readonly AccessTools.FieldRef<NRunHistory, int> IndexRef =
+        AccessTools.FieldRefAccess<NRunHistory, int>("_index");
+
+    private static readonly AccessTools.FieldRef<NSubmenu, NSubmenuStack> SubmenuStackRef =
+        AccessTools.FieldRefAccess<NSubmenu, NSubmenuStack>("_stack");
+
+    private static readonly Func<NRunHistory, int, Task> RefreshAndSelectRunDelegate =
+        AccessTools.MethodDelegate<Func<NRunHistory, int, Task>>(
             AccessTools.Method(typeof(NRunHistory), "RefreshAndSelectRun", new[] { typeof(int) }));
 
     private static string? _lastDirectory;
@@ -92,15 +109,24 @@ internal static class RunHistoryShareUiHelper
             container.GrowHorizontal = Control.GrowDirection.Begin;
             container.GrowVertical = Control.GrowDirection.Begin;
             container.OffsetLeft = -220f;
-            container.OffsetTop = -186f;
+            container.OffsetTop = -260f;
             container.OffsetRight = -48f;
             container.OffsetBottom = -48f;
             container.AddThemeConstantOverride("separation", 10);
             historyScreen.AddChild(container);
 
+            NButton deleteBtn = InstantiateShareButton(
+                buttonScene,
+                "DeleteButton",
+                "Delete",
+                out Control deleteLabelContainer,
+                HoverDeletePillColor,
+                PressDeletePillColor,
+                StsColors.red);
             NButton exportBtn = InstantiateShareButton(buttonScene, "ExportButton", "Export", out Control exportLabelContainer);
             NButton importBtn = InstantiateShareButton(buttonScene, "ImportButton", "Import", out Control importLabelContainer);
 
+            container.AddChild(deleteBtn);
             container.AddChild(exportBtn);
             container.AddChild(importBtn);
 
@@ -109,15 +135,23 @@ internal static class RunHistoryShareUiHelper
 
             ShareUiState state = new ShareUiState
             {
+                DeleteButton = deleteBtn,
+                DeleteLabelContainer = deleteLabelContainer,
                 ExportButton = exportBtn,
                 ExportLabelContainer = exportLabelContainer,
                 ImportButton = importBtn,
+                DeleteTipDescription = "Delete unavailable: only imported runs can be deleted.",
                 ExportTipDescription = "No Run Resumer snapshots saved for this run."
             };
             UiStates.Add(historyScreen, state);
 
+            SetButtonEnabled(deleteBtn, deleteLabelContainer, enabled: false);
             SetButtonEnabled(exportBtn, exportLabelContainer, enabled: false);
 
+            deleteBtn.Connect(NClickableControl.SignalName.Released, Callable.From<NButton>(_ =>
+            {
+                OnDeletePressed(historyScreen);
+            }));
             exportBtn.Connect(NClickableControl.SignalName.Released, Callable.From<NButton>(_ =>
             {
                 OnExportPressed(historyScreen);
@@ -127,6 +161,7 @@ internal static class RunHistoryShareUiHelper
                 OnImportPressed(historyScreen);
             }));
 
+            WireHoverTip(deleteBtn, DeleteTipTitleKey, "Delete", () => state.DeleteTipDescription);
             WireHoverTip(exportBtn, ExportTipTitleKey, "Export", () => state.ExportTipDescription);
             WireHoverTip(importBtn, ImportTipTitleKey, "Import", () => "Import a shared [gold].zip[/gold] run archive (or drag and drop onto the window).");
         }
@@ -136,11 +171,29 @@ internal static class RunHistoryShareUiHelper
         }
     }
 
-    public static void UpdateExportState(NRunHistory historyScreen, RunHistory? history)
+    public static void UpdateRunState(NRunHistory historyScreen, RunHistory? history)
     {
         if (!UiStates.TryGetValue(historyScreen, out ShareUiState? state))
         {
             return;
+        }
+
+        bool isImported = history != null && history.Players.Count == 1 && RunArchiveStorage.IsImported(history);
+        if (isImported)
+        {
+            SetButtonEnabled(state.DeleteButton, state.DeleteLabelContainer, enabled: true);
+            state.DeleteTipDescription = "Delete this imported run from Run History.";
+
+            MegaRichTextLabel? gameModeLabel = historyScreen.GetNodeOrNull<MegaRichTextLabel>("%GameModeLabel");
+            if (gameModeLabel != null && !gameModeLabel.Text.Contains("(Imported)", StringComparison.Ordinal))
+            {
+                gameModeLabel.Text = $"{gameModeLabel.Text}  [aqua](Imported)[/aqua]";
+            }
+        }
+        else
+        {
+            SetButtonEnabled(state.DeleteButton, state.DeleteLabelContainer, enabled: false);
+            state.DeleteTipDescription = "Delete unavailable: only imported runs can be deleted.";
         }
 
         if (history == null)
@@ -191,7 +244,10 @@ internal static class RunHistoryShareUiHelper
         PackedScene buttonScene,
         string name,
         string labelText,
-        out Control labelContainer)
+        out Control labelContainer,
+        Color? hoverPillColor = null,
+        Color? pressPillColor = null,
+        Color? hoverTextColor = null)
     {
         NButton button = buttonScene.Instantiate<NButton>(PackedScene.GenEditState.Disabled);
         button.Name = name;
@@ -211,11 +267,19 @@ internal static class RunHistoryShareUiHelper
         }));
 
         labelContainer = button.GetNode<Control>("LabelContainer");
-        WireButtonHighlight(button);
+        WireButtonHighlight(
+            button,
+            hoverPillColor ?? HoverButtonPillColor,
+            pressPillColor ?? PressButtonPillColor,
+            hoverTextColor ?? StsColors.gold);
         return button;
     }
 
-    private static void WireButtonHighlight(NButton button)
+    private static void WireButtonHighlight(
+        NButton button,
+        Color hoverPillColor,
+        Color pressPillColor,
+        Color hoverTextColor)
     {
         TextureRect? buttonImage = button.GetNodeOrNull<TextureRect>("%ButtonImage");
         TextureRect? shadow = buttonImage?.GetNodeOrNull<TextureRect>("Shadow");
@@ -278,9 +342,9 @@ internal static class RunHistoryShareUiHelper
             }
         }
 
-        void SetHovered() => AnimateTo(HoverScale, HoverButtonPillColor, StsColors.gold, 0.05, fast: true);
+        void SetHovered() => AnimateTo(HoverScale, hoverPillColor, hoverTextColor, 0.05, fast: true);
         void SetRest() => AnimateTo(Vector2.One, RestButtonPillColor, StsColors.cream, 0.25, fast: false);
-        void SetPressed() => AnimateTo(PressScale, PressButtonPillColor, StsColors.lightGray, 0.12, fast: false);
+        void SetPressed() => AnimateTo(PressScale, pressPillColor, StsColors.lightGray, 0.12, fast: false);
 
         button.Connect(NClickableControl.SignalName.Focused, Callable.From<NClickableControl>(_ =>
         {
@@ -391,15 +455,105 @@ internal static class RunHistoryShareUiHelper
 
     private static void EnsureTipTitleRegistered(string titleKey, string titleText)
     {
-        if (LocManager.Instance == null || LocString.Exists(HoverTipTable, titleKey))
+        EnsureLocStringRegistered(HoverTipTable, titleKey, titleText);
+    }
+
+    private static void EnsureLocStringRegistered(string tableName, string key, string text)
+    {
+        if (LocManager.Instance == null || LocString.Exists(tableName, key))
         {
             return;
         }
 
-        LocManager.Instance.GetTable(HoverTipTable).MergeWith(new Dictionary<string, string>
+        LocManager.Instance.GetTable(tableName).MergeWith(new Dictionary<string, string>
         {
-            [titleKey] = titleText
+            [key] = text
         });
+    }
+
+    private static void OnDeletePressed(NRunHistory historyScreen)
+    {
+        RunHistory? history = HistoryRef(historyScreen);
+        if (history == null || history.Players.Count != 1 || !RunArchiveStorage.IsImported(history))
+        {
+            ShowErrorPopup("Delete Unavailable", "Only imported runs can be deleted.");
+            return;
+        }
+
+        TaskHelper.RunSafely(ConfirmAndDeleteImportedRunAsync(historyScreen, history.StartTime));
+    }
+
+    private static async Task ConfirmAndDeleteImportedRunAsync(NRunHistory historyScreen, long startTime)
+    {
+        NGenericPopup? popup = NGenericPopup.Create();
+        if (popup != null && NModalContainer.Instance != null)
+        {
+            EnsureLocStringRegistered(MainMenuUiTable, DeletePopupHeaderKey, "Delete Imported Run");
+            EnsureLocStringRegistered(
+                MainMenuUiTable,
+                DeletePopupBodyKey,
+                "Delete this imported run from Run History? Your exported .zip file will not be affected.");
+
+            NModalContainer.Instance.Add(popup);
+            bool confirmed = await popup.WaitForConfirmation(
+                new LocString(MainMenuUiTable, DeletePopupBodyKey),
+                new LocString(MainMenuUiTable, DeletePopupHeaderKey),
+                new LocString(MainMenuUiTable, "GENERIC_POPUP.cancel"),
+                new LocString(MainMenuUiTable, "GENERIC_POPUP.confirm"));
+
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        if (!GodotObject.IsInstanceValid(historyScreen))
+        {
+            return;
+        }
+
+        try
+        {
+            int previousIndex = IndexRef(historyScreen);
+            RunShareService.DeleteImportedRun(startTime);
+            Log.Info($"[RunResumer] Deleted imported run {startTime}");
+
+            List<string> runNames = RunNamesRef(historyScreen);
+            runNames.Clear();
+            runNames.AddRange(SaveManager.Instance.GetAllRunHistoryNames());
+            runNames.Reverse();
+
+            if (runNames.Count == 0)
+            {
+                NSubmenuStack? stack = SubmenuStackRef(historyScreen);
+                if (stack != null)
+                {
+                    stack.Pop();
+                    if (stack.Peek() is NCompendiumSubmenu compendium
+                        && compendium.GetNodeOrNull<Control>("%RunHistoryButton") is { } runHistoryButton)
+                    {
+                        runHistoryButton.Visible = NRunHistory.CanBeShown();
+                    }
+                }
+            }
+            else
+            {
+                int nextIndex = Math.Clamp(previousIndex, 0, runNames.Count - 1);
+                await RefreshAndSelectRunDelegate(historyScreen, nextIndex);
+            }
+
+            ShowToast("Deleted imported run");
+        }
+        catch (RunShareValidationException ex)
+        {
+            Log.Warn($"[RunResumer] Rejected delete for run {startTime}: {ex.Message}");
+            ShowErrorPopup("Delete Failed", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"[RunResumer] Failed to delete imported run {startTime}: {ex}");
+            ShowErrorPopup("Delete Failed", $"Could not delete imported run: {ex.Message}");
+        }
     }
 
     private static void OnExportPressed(NRunHistory historyScreen)
@@ -609,7 +763,7 @@ internal static class RunHistoryShareDisplayPatch
 {
     public static void Postfix(NRunHistory __instance, RunHistory history)
     {
-        RunHistoryShareUiHelper.UpdateExportState(__instance, history);
+        RunHistoryShareUiHelper.UpdateRunState(__instance, history);
     }
 }
 

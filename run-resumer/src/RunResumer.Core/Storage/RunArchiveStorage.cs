@@ -15,8 +15,10 @@ internal static class RunArchiveStorage
     private const string ArchiveDirName = "run_resumer";
     private const string ArchiveExtension = ".rrpb";
 
+    private sealed record ArchiveIndex(HashSet<int> Floors, bool IsImported);
+
     private static readonly object _sync = new object();
-    private static readonly Dictionary<(int profileId, long startTime), HashSet<int>> _floorIndexCache = new();
+    private static readonly Dictionary<(int profileId, long startTime), ArchiveIndex> _floorIndexCache = new();
     private static (int profileId, long startTime, RunArchive archive)? _activeArchive;
 
     public static void InvalidateCache()
@@ -68,7 +70,7 @@ internal static class RunArchiveStorage
         int profileId = SaveManager.Instance.CurrentProfileId;
         lock (_sync)
         {
-            return GetOrLoadFloorIndexLocked(profileId, history.StartTime).Contains(floorNum);
+            return GetOrLoadArchiveIndexLocked(profileId, history.StartTime).Floors.Contains(floorNum);
         }
     }
 
@@ -82,7 +84,31 @@ internal static class RunArchiveStorage
         int profileId = SaveManager.Instance.CurrentProfileId;
         lock (_sync)
         {
-            return GetOrLoadFloorIndexLocked(profileId, history.StartTime).Count > 0;
+            return GetOrLoadArchiveIndexLocked(profileId, history.StartTime).Floors.Count > 0;
+        }
+    }
+
+    public static bool IsImported(RunHistory? history)
+    {
+        if (TestMode.IsOn || history == null || history.Players.Count != 1)
+        {
+            return false;
+        }
+
+        return IsImported(history.StartTime);
+    }
+
+    public static bool IsImported(long startTime)
+    {
+        if (TestMode.IsOn || startTime <= 0)
+        {
+            return false;
+        }
+
+        int profileId = SaveManager.Instance.CurrentProfileId;
+        lock (_sync)
+        {
+            return GetOrLoadArchiveIndexLocked(profileId, startTime).IsImported;
         }
     }
 
@@ -169,9 +195,9 @@ internal static class RunArchiveStorage
         }
     }
 
-    private static HashSet<int> GetOrLoadFloorIndexLocked(int profileId, long startTime)
+    private static ArchiveIndex GetOrLoadArchiveIndexLocked(int profileId, long startTime)
     {
-        if (_floorIndexCache.TryGetValue((profileId, startTime), out HashSet<int>? cached))
+        if (_floorIndexCache.TryGetValue((profileId, startTime), out ArchiveIndex? cached))
         {
             return cached;
         }
@@ -179,7 +205,7 @@ internal static class RunArchiveStorage
         string path = GetArchiveOsPath(startTime);
         if (!File.Exists(path))
         {
-            HashSet<int> empty = new HashSet<int>();
+            ArchiveIndex empty = new ArchiveIndex(new HashSet<int>(), IsImported: false);
             _floorIndexCache[(profileId, startTime)] = empty;
             return empty;
         }
@@ -192,7 +218,7 @@ internal static class RunArchiveStorage
         catch (Exception ex)
         {
             Log.Warn($"[RunResumer] Failed to index archive {path}: {ex.Message}");
-            HashSet<int> empty = new HashSet<int>();
+            ArchiveIndex empty = new ArchiveIndex(new HashSet<int>(), IsImported: false);
             _floorIndexCache[(profileId, startTime)] = empty;
             return empty;
         }
@@ -327,15 +353,16 @@ internal static class RunArchiveStorage
         return archive;
     }
 
-    private static HashSet<int> UpdateFloorIndexCacheLocked(int profileId, RunArchive archive)
+    private static ArchiveIndex UpdateFloorIndexCacheLocked(int profileId, RunArchive archive)
     {
         HashSet<int> floors = new HashSet<int>(archive.Floors.Count);
         foreach (PbFloorSnapshot floor in archive.Floors)
         {
             floors.Add(floor.FloorNum);
         }
-        _floorIndexCache[(profileId, archive.StartTime)] = floors;
-        return floors;
+        ArchiveIndex index = new ArchiveIndex(floors, archive.IsImported);
+        _floorIndexCache[(profileId, archive.StartTime)] = index;
+        return index;
     }
 
     private static string GetArchiveDirectoryOsPath()

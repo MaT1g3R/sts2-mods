@@ -18,6 +18,7 @@ namespace RunResumer.Replay;
 internal static class ReplaySession
 {
     private static bool _isLaunching;
+    private static bool _isReturningToMenu;
 
     public static bool IsActive { get; private set; }
 
@@ -70,6 +71,37 @@ internal static class ReplaySession
             ReplayedRunStartTime = null;
             ReplayedFromFloor = null;
         }
+        _isReturningToMenu = false;
+    }
+
+    public static void ReturnToHistoryAfterRunEnd()
+    {
+        if (!IsActive || _isReturningToMenu)
+        {
+            return;
+        }
+
+        NGame? game = NGame.Instance;
+        if (game == null)
+        {
+            return;
+        }
+
+        _isReturningToMenu = true;
+        Log.Info($"[RunResumer] Run ended during practice replay (run {ReplayedRunStartTime}); returning directly to Run History");
+        TaskHelper.RunSafely(ReturnToHistoryAsync(game));
+    }
+
+    private static async Task ReturnToHistoryAsync(NGame game)
+    {
+        try
+        {
+            await game.ReturnToMainMenuAfterRun();
+        }
+        finally
+        {
+            _isReturningToMenu = false;
+        }
     }
 
     public static void ClearAll()
@@ -79,6 +111,7 @@ internal static class ReplaySession
         ReplayedFromFloor = null;
         PendingReturnStartTime = null;
         _isLaunching = false;
+        _isReturningToMenu = false;
     }
 
     private static async Task LaunchReplayAsync(SerializableRun serializableRun, long runStartTime, int floorNum)

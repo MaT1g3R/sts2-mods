@@ -120,7 +120,7 @@ internal static class Program
             checkedPatches++;
         }
 
-        Assert(checkedPatches == 14, $"Expected 14 patch classes, checked {checkedPatches}");
+        Assert(checkedPatches == 15, $"Expected 15 patch classes, checked {checkedPatches}");
         Console.WriteLine($"[PASS] Verified all {checkedPatches} Harmony patch targets resolve against sts2.dll");
     }
 

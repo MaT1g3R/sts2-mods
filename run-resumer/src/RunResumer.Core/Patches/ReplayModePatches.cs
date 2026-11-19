@@ -9,7 +9,9 @@ using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
+using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
@@ -58,6 +60,23 @@ internal static class DailyRunUploadScorePatch
         }
 
         __result = Task.CompletedTask;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(NRun), nameof(NRun.ShowGameOverScreen))]
+internal static class ShowGameOverScreenPatch
+{
+    public static bool Prefix()
+    {
+        if (!ReplaySession.IsActive)
+        {
+            return true;
+        }
+
+        NCapstoneContainer.Instance?.Close();
+        NMapScreen.Instance?.Close();
+        ReplaySession.ReturnToHistoryAfterRunEnd();
         return false;
     }
 }

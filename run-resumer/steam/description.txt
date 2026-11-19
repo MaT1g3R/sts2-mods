@@ -1,13 +1,10 @@
-Captures compact per-floor snapshots during singleplayer runs and lets you right-click any floor node in Run History to practice from that floor.
+Replay any floor from your past single player runs.
 
 Features:
 [list]
-[*] [b]Right-click any floor in Run History[/b] to immediately replay from the start of that floor
-[*] [b]Hover-tip availability hint[/b] shows on each Run History node whether a replay snapshot is available
-[*] [b]Non-destructive practice mode[/b] — replaying never modifies your active run save, progression, unlocks, stats, Run History, or Daily leaderboards
-[*] [b]Instant iteration[/b] — quitting or finishing a practice replay returns you straight back to Run History on the same run
-[*] [b]Compact storage outside Steam Cloud[/b] — stores one Brotli-compressed, deduplicated Protobuf archive per run (~4 KB for a 50-floor run) in your local profile folder and automatically cleans up orphans
-[*] [b]Standalone[/b] — no external mod dependencies required (singleplayer runs only)
+[*] [b]Right-click any floor in Run History to replay[/b]. Jump straight back to the start of any floor.
+[*] [b]Export and import runs to share with friends[/b]. Save a run as a .zip file from Run History and send it to friends, or load theirs with the Import button or by dragging the .zip file onto the game window.
+[*] [b]Much smaller file sizes[/b]: takes up far less disk space than the Slay the Spire 1 Run Resumer.
 [/list]
 
 Inspired by [url=https://github.com/Alchyr/RunResumer]RunResumer[/url] for Slay the Spire 1 by Alchyr.

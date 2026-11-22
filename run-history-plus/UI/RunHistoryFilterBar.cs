@@ -862,7 +862,7 @@ internal sealed class RunHistoryFilterBar
                 return Array.Empty<(string Label, Action OnSelected)>();
             }
 
-            ResizeRunSelectorToFit(_filteredRuns);
+            ResizeRunSelectorToFit(_filteredRuns, IndexRef(_screen));
 
             var items = new List<(string Label, Action OnSelected)>(_filteredRuns.Count);
             for (int i = 0; i < _filteredRuns.Count; i++)
@@ -882,7 +882,7 @@ internal sealed class RunHistoryFilterBar
         });
     }
 
-    private void ResizeRunSelectorToFit(IReadOnlyList<RunSummary> runs)
+    private void ResizeRunSelectorToFit(IReadOnlyList<RunSummary> runs, int selectedIndex = 0)
     {
         if (_runSelectorDropdown == null || _runSelectorHolder == null || runs.Count == 0)
         {
@@ -892,16 +892,23 @@ internal sealed class RunHistoryFilterBar
         float maxTextWidth = 0f;
         for (int i = 0; i < runs.Count; i++)
         {
+            if (!runs[i].LoadSucceeded)
+            {
+                continue;
+            }
+
             string plain = RunFilterEngine.FormatRunLabel(runs[i]);
-            float w = MeasureTextWidth(plain, 20);
+            // Measure items at their actual rendered font size (18), and the selected header at 20
+            int size = i == selectedIndex ? 20 : 18;
+            float w = MeasureTextWidth(plain, size);
             if (w > maxTextWidth)
             {
                 maxTextWidth = w;
             }
         }
 
-        // Left padding (10) + right arrow/scrollbar clearance (40) + small breathing room (12)
-        float targetWidth = Mathf.Clamp(Mathf.Ceil(maxTextWidth + 62f), 320f, 620f);
+        // Left padding (10) + right arrow/scrollbar clearance (34)
+        float targetWidth = Mathf.Clamp(Mathf.Ceil(maxTextWidth + 44f), 300f, 560f);
         ApplyRunSelectorWidth(targetWidth);
     }
 
@@ -913,7 +920,7 @@ internal sealed class RunHistoryFilterBar
         }
 
         float textWidth = MeasureTextWidth(plainText, 20);
-        float targetWidth = Mathf.Clamp(Mathf.Ceil(textWidth + 62f), 320f, 620f);
+        float targetWidth = Mathf.Clamp(Mathf.Ceil(textWidth + 44f), 300f, 560f);
         ApplyRunSelectorWidth(targetWidth);
     }
 
@@ -955,7 +962,7 @@ internal sealed class RunHistoryFilterBar
                 return;
             }
 
-            ResizeRunSelectorToFit(_filteredRuns);
+            ResizeRunSelectorToFit(_filteredRuns, IndexRef(_screen));
             _runSelectorDropdown.SetSelectedText(RunFilterEngine.FormatRunLabelBbcode(_filteredRuns[index]));
             return;
         }

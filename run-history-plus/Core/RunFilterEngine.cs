@@ -26,7 +26,66 @@ public static class RunFilterEngine
             return false;
         }
 
+        if (!MatchesRelics(run, state.RequiredRelicIds, state.RelicMatchMode))
+        {
+            return false;
+        }
+
         return true;
+    }
+
+    public static bool MatchesRelics(
+        RunSummary run,
+        IReadOnlyCollection<string> selectedRelicIds,
+        MultiMatchMode mode)
+    {
+        if (selectedRelicIds.Count == 0)
+        {
+            return true;
+        }
+
+        if (run.PlayerRelicIds.Count == 0)
+        {
+            return false;
+        }
+
+        if (mode == MultiMatchMode.Any)
+        {
+            foreach (string requiredId in selectedRelicIds)
+            {
+                if (ContainsIgnoreCase(run.PlayerRelicIds, requiredId))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        foreach (string requiredId in selectedRelicIds)
+        {
+            if (!ContainsIgnoreCase(run.PlayerRelicIds, requiredId))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool ContainsIgnoreCase(IReadOnlyCollection<string> collection, string target)
+    {
+        if (collection is HashSet<string> set && ReferenceEquals(set.Comparer, StringComparer.OrdinalIgnoreCase))
+        {
+            return set.Contains(target);
+        }
+
+        foreach (string item in collection)
+        {
+            if (string.Equals(item, target, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static bool MatchesOutcome(RunSummary run, OutcomeFilter outcome) => outcome switch
@@ -44,15 +103,7 @@ public static class RunFilterEngine
             return true;
         }
 
-        for (int i = 0; i < run.PlayerCharacterIds.Count; i++)
-        {
-            if (string.Equals(run.PlayerCharacterIds[i], characterId, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return string.Equals(run.PrimaryCharacterId, characterId, StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool MatchesGameType(RunSummary run, GameTypeFilter gameType) => gameType switch

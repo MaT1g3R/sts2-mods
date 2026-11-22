@@ -88,6 +88,7 @@ internal sealed class RunHistoryFilterBar
     private Font? _boldFont;
 
     private Label? _matchCountLabel;
+    private Button? _moreFiltersButton;
     private Control? _emptyStateOverlay;
     private MoreFiltersPanel? _moreFiltersPanel;
 
@@ -230,25 +231,30 @@ internal sealed class RunHistoryFilterBar
         }
 
         // --- Left-side "More Filters" button (placed above BackButton) ---
-        _moreFiltersPanel = new MoreFiltersPanel(ResetFiltersAndRefresh);
+        _moreFiltersPanel = new MoreFiltersPanel(_state, OnMoreFiltersChanged);
 
-        Button moreFiltersBtn = MoreFiltersPanel.CreateStyledButton(
+        _moreFiltersButton = MoreFiltersPanel.CreateStyledButton(
             "More Filters",
             boldFont,
             () =>
             {
                 CloseAllDropdowns();
+                if (!_indexReady)
+                {
+                    StartBackgroundIndexing();
+                }
+                UpdateMoreFiltersMatchSummary();
                 _moreFiltersPanel.Toggle();
             },
             new Vector2(200f, 52f));
-        moreFiltersBtn.Name = "MoreFiltersButton";
-        moreFiltersBtn.SetAnchorsPreset(Control.LayoutPreset.BottomLeft);
-        moreFiltersBtn.GrowVertical = Control.GrowDirection.Begin;
-        moreFiltersBtn.OffsetLeft = 20f;
-        moreFiltersBtn.OffsetRight = 220f;
-        moreFiltersBtn.OffsetTop = -436f;
-        moreFiltersBtn.OffsetBottom = -384f;
-        _screen.AddChild(moreFiltersBtn);
+        _moreFiltersButton.Name = "MoreFiltersButton";
+        _moreFiltersButton.SetAnchorsPreset(Control.LayoutPreset.BottomLeft);
+        _moreFiltersButton.GrowVertical = Control.GrowDirection.Begin;
+        _moreFiltersButton.OffsetLeft = 20f;
+        _moreFiltersButton.OffsetRight = 220f;
+        _moreFiltersButton.OffsetTop = -436f;
+        _moreFiltersButton.OffsetBottom = -384f;
+        _screen.AddChild(_moreFiltersButton);
 
         // --- Empty-state overlay when 0 runs match current filters ---
         _emptyStateOverlay = BuildEmptyStateOverlay(boldFont, regularFont);
@@ -485,15 +491,61 @@ internal sealed class RunHistoryFilterBar
         HideEmptyState();
         PopulateCharacterDropdown();
         _runSelectorDropdown?.InvalidateLazyItems();
+        UpdateMoreFiltersButtonLabel();
+        _moreFiltersPanel?.RefreshState();
 
         int totalRuns = RunNamesRef(_screen).Count;
         if (_matchCountLabel != null)
         {
             _matchCountLabel.Text = $"{totalRuns} runs";
         }
+        UpdateMoreFiltersMatchSummary();
 
         // Vanilla just loaded index 0 into _history; update the Run Selector label with zero extra I/O
         SyncSelectedRunLabel(IndexRef(_screen));
+    }
+
+    private void OnMoreFiltersChanged()
+    {
+        UpdateMoreFiltersButtonLabel();
+        RequestFilterOrSortUpdate();
+    }
+
+    private void UpdateMoreFiltersButtonLabel()
+    {
+        if (_moreFiltersButton == null)
+        {
+            return;
+        }
+
+        int count = _state.ActiveMoreFilterCount;
+        _moreFiltersButton.Text = count > 0 ? $"More Filters ({count})" : "More Filters";
+        _moreFiltersButton.AddThemeColorOverride("font_color", count > 0 ? GoldColor : CreamColor);
+    }
+
+    private void UpdateMoreFiltersMatchSummary()
+    {
+        if (_moreFiltersPanel == null)
+        {
+            return;
+        }
+
+        if (_isIndexing)
+        {
+            _moreFiltersPanel.UpdateMatchSummary("Loading runs...");
+            return;
+        }
+
+        if (_indexReady)
+        {
+            _moreFiltersPanel.UpdateMatchSummary(
+                _filteredRuns.Count == _allRuns.Count
+                    ? $"{_allRuns.Count} runs"
+                    : $"Showing {_filteredRuns.Count} / {_allRuns.Count} runs");
+            return;
+        }
+
+        _moreFiltersPanel.UpdateMatchSummary($"{RunNamesRef(_screen).Count} runs");
     }
 
     private void RequestFilterOrSortUpdate()
@@ -711,6 +763,8 @@ internal sealed class RunHistoryFilterBar
         _outcomeDropdown?.SetSelectedText(RunFilterEngine.GetOutcomeLabel(_state.Outcome));
         _characterDropdown?.SetSelectedText("All Characters");
         _gameTypeDropdown?.SetSelectedText(RunFilterEngine.GetGameTypeLabel(_state.GameType));
+        UpdateMoreFiltersButtonLabel();
+        _moreFiltersPanel?.RefreshState();
         RequestFilterOrSortUpdate();
     }
 
@@ -962,14 +1016,14 @@ internal sealed class RunHistoryFilterBar
 
     private void UpdateMatchCountLabel()
     {
-        if (_matchCountLabel == null)
+        if (_matchCountLabel != null)
         {
-            return;
+            _matchCountLabel.Text = _filteredRuns.Count == _allRuns.Count
+                ? $"{_allRuns.Count} runs"
+                : $"Showing {_filteredRuns.Count} / {_allRuns.Count}";
         }
 
-        _matchCountLabel.Text = _filteredRuns.Count == _allRuns.Count
-            ? $"{_allRuns.Count} runs"
-            : $"Showing {_filteredRuns.Count} / {_allRuns.Count}";
+        UpdateMoreFiltersMatchSummary();
     }
 
     private Control BuildEmptyStateOverlay(Font? boldFont, Font? regularFont)
@@ -1131,11 +1185,22 @@ internal sealed class RunHistoryFilterBar
         int badgeCount = primaryPlayer?.Badges.Count() ?? 0;
         int relicCount = primaryPlayer?.Relics.Count() ?? 0;
         int cardCount = primaryPlayer?.Deck.Count() ?? 0;
-        List<string> playerCharIds = history.Players
-            .Select(p => p.Character.Entry)
-            .Where(id => !string.IsNullOrEmpty(id))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        IReadOnlyList<string> playerCharIds = string.IsNullOrEmpty(primaryCharId)
+            ? Array.Empty<string>()
+            : new[] { primaryCharId };
+
+        var playerRelicIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (primaryPlayer != null)
+        {
+            foreach (var relic in primaryPlayer.Relics)
+            {
+                string? entry = relic.Id?.Entry;
+                if (!string.IsNullOrEmpty(entry))
+                {
+                    playerRelicIds.Add(entry);
+                }
+            }
+        }
 
         return new RunSummary(
             fileName,
@@ -1152,6 +1217,7 @@ internal sealed class RunHistoryFilterBar
             primaryCharId,
             primaryCharName,
             playerCharIds,
+            playerRelicIds,
             history.Players.Count,
             history.Seed,
             true);

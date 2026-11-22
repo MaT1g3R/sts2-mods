@@ -48,15 +48,15 @@ public static class FastRunSummaryParser
         string seed = GetString(root, "seed");
         RunGameType gameType = ParseGameType(root, isCustomGame);
 
-        // Players: find primary player (matching localPlayerId, else first) + badge/relic/card counts
+        // Players: find primary (local) player (matching localPlayerId, else first).
+        // All filters (character, relics, counts) apply only to the local player's character.
         int playerCount = 0;
         string primaryCharId = string.Empty;
         int badgeCount = 0;
         int relicCount = 0;
         int cardCount = 0;
         bool matchedLocalPlayer = false;
-        var playerCharIds = new List<string>();
-        var seenChars = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var primaryRelicIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         if (root.TryGetProperty("players", out JsonElement playersEl) && playersEl.ValueKind == JsonValueKind.Array)
         {
@@ -64,14 +64,8 @@ public static class FastRunSummaryParser
             {
                 playerCount++;
                 ulong playerId = GetUInt64(playerEl, "id");
-                string charId = NormalizeModelEntry(GetString(playerEl, "character"));
-
-                if (!string.IsNullOrEmpty(charId) && seenChars.Add(charId))
-                {
-                    playerCharIds.Add(charId);
-                }
-
                 bool isLocal = localPlayerId != 0 && playerId == localPlayerId;
+
                 if (isLocal || (!matchedLocalPlayer && playerCount == 1))
                 {
                     if (isLocal)
@@ -79,13 +73,33 @@ public static class FastRunSummaryParser
                         matchedLocalPlayer = true;
                     }
 
-                    primaryCharId = charId;
+                    primaryCharId = NormalizeModelEntry(GetString(playerEl, "character"));
                     badgeCount = GetArrayLength(playerEl, "badges");
-                    relicCount = GetArrayLength(playerEl, "relics");
                     cardCount = GetArrayLength(playerEl, "deck");
+
+                    primaryRelicIds.Clear();
+                    int thisPlayerRelicCount = 0;
+                    if (playerEl.TryGetProperty("relics", out JsonElement relicsEl) && relicsEl.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (JsonElement relicEl in relicsEl.EnumerateArray())
+                        {
+                            thisPlayerRelicCount++;
+                            string relicId = NormalizeModelEntry(GetString(relicEl, "id"));
+                            if (!string.IsNullOrEmpty(relicId))
+                            {
+                                primaryRelicIds.Add(relicId);
+                            }
+                        }
+                    }
+                    relicCount = thisPlayerRelicCount;
                 }
             }
         }
+
+        IReadOnlyList<string> playerCharIds = string.IsNullOrEmpty(primaryCharId)
+            ? Array.Empty<string>()
+            : new[] { primaryCharId };
+        IReadOnlyCollection<string> playerRelicIds = primaryRelicIds;
 
         string primaryCharName = ResolveCharacterDisplayName(primaryCharId, characterDisplayNames);
 
@@ -116,6 +130,7 @@ public static class FastRunSummaryParser
             primaryCharId,
             primaryCharName,
             playerCharIds,
+            playerRelicIds,
             playerCount,
             seed,
             true);
@@ -123,7 +138,7 @@ public static class FastRunSummaryParser
 
     public static RunSummary Unreadable(string fileName) => new(
         fileName, 0, 0f, 0, 0, 0, 0, 0, false, false, RunGameType.Unknown,
-        string.Empty, "Unknown", Array.Empty<string>(), 0, string.Empty, false);
+        string.Empty, "Unknown", Array.Empty<string>(), Array.Empty<string>(), 0, string.Empty, false);
 
     private static RunGameType ParseGameType(JsonElement root, bool isCustomGame)
     {

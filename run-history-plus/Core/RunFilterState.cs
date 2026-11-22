@@ -27,6 +27,12 @@ public enum GameTypeFilter
     Custom
 }
 
+public enum MultiMatchMode
+{
+    All,
+    Any
+}
+
 public enum SortField
 {
     Date,
@@ -47,24 +53,38 @@ public sealed class RunFilterState
     public OutcomeFilter Outcome { get; set; } = OutcomeFilter.All;
     public string? CharacterId { get; set; }
     public GameTypeFilter GameType { get; set; } = GameTypeFilter.Any;
+    public HashSet<string> RequiredRelicIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public MultiMatchMode RelicMatchMode { get; set; } = MultiMatchMode.All;
     public SortField SortBy { get; set; } = SortField.Date;
     public SortDirection SortDirection { get; set; } = SortDirection.Descending;
+
+    public bool HasMoreFilters => RequiredRelicIds.Count > 0;
+
+    public int ActiveMoreFilterCount => RequiredRelicIds.Count;
 
     public bool HasActiveFilters =>
         Outcome != OutcomeFilter.All ||
         !string.IsNullOrEmpty(CharacterId) ||
-        GameType != GameTypeFilter.Any;
+        GameType != GameTypeFilter.Any ||
+        HasMoreFilters;
 
     public bool IsDefault =>
         !HasActiveFilters &&
         SortBy == SortField.Date &&
         SortDirection == SortDirection.Descending;
 
+    public void ClearMoreFilters()
+    {
+        RequiredRelicIds.Clear();
+        RelicMatchMode = MultiMatchMode.All;
+    }
+
     public void ResetFilters()
     {
         Outcome = OutcomeFilter.All;
         CharacterId = null;
         GameType = GameTypeFilter.Any;
+        ClearMoreFilters();
     }
 
     public void ResetAll()
@@ -90,6 +110,7 @@ public sealed record RunSummary(
     string PrimaryCharacterId,
     string PrimaryCharacterName,
     IReadOnlyList<string> PlayerCharacterIds,
+    IReadOnlyCollection<string> PlayerRelicIds,
     int PlayerCount,
     string Seed,
     bool LoadSucceeded);

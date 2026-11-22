@@ -21,6 +21,7 @@ public class RunFilterEngineTests
         string charId = "IRONCLAD",
         string charName = "The Ironclad",
         IReadOnlyList<string>? playerChars = null,
+        IReadOnlyCollection<string>? playerRelics = null,
         int playerCount = 1,
         bool loadSucceeded = true)
     {
@@ -39,6 +40,7 @@ public class RunFilterEngineTests
             charId,
             charName,
             playerChars ?? new[] { charId },
+            playerRelics ?? Array.Empty<string>(),
             playerCount,
             "SEED123",
             loadSucceeded);
@@ -92,21 +94,19 @@ public class RunFilterEngineTests
     }
 
     [Fact]
-    public void Filters_ByCharacter_IncludingMultiplayerTeammates()
+    public void Filters_ByCharacter_MatchesOnlyLocalPlayerInMultiplayer()
     {
         var runs = new[]
         {
             MakeRun("solo_ironclad.run", charId: "IRONCLAD", charName: "The Ironclad"),
             MakeRun("solo_defect.run", charId: "DEFECT", charName: "The Defect"),
-            MakeRun("coop.run", charId: "SILENT", charName: "The Silent", playerChars: new[] { "SILENT", "DEFECT" }, playerCount: 2)
+            MakeRun("coop_local_silent.run", charId: "SILENT", charName: "The Silent", playerChars: new[] { "SILENT", "DEFECT" }, playerCount: 2)
         };
 
         var state = new RunFilterState { CharacterId = "defect" };
-        var result = RunFilterEngine.Apply(runs, state).Select(r => r.FileName).ToHashSet();
+        var result = RunFilterEngine.Apply(runs, state).Select(r => r.FileName).ToList();
 
-        Assert.Equal(2, result.Count);
-        Assert.Contains("solo_defect.run", result);
-        Assert.Contains("coop.run", result);
+        Assert.Equal(new[] { "solo_defect.run" }, result);
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class RunFilterEngineTests
               "id": 42,
               "character": "CHARACTER.DEFECT",
               "badges": [{}, {}, {}, {}],
-              "relics": [{}, {}, {}],
+              "relics": [{ "id": "RELIC.CRACKED_CORE" }, { "id": "RELIC.ANCHOR" }, { "id": "BAG_OF_PREP" }],
               "deck": [{}, {}, {}, {}, {}]
             }
           ],
@@ -239,5 +239,104 @@ public class RunFilterEngineTests
         Assert.Equal(4, summary.BadgeCount);
         Assert.Equal(3, summary.RelicCount);
         Assert.Equal(5, summary.CardCount);
+        Assert.Contains("CRACKED_CORE", summary.PlayerRelicIds);
+        Assert.Contains("ANCHOR", summary.PlayerRelicIds);
+        Assert.Contains("BAG_OF_PREP", summary.PlayerRelicIds);
+    }
+
+    [Fact]
+    public void FastParser_Multiplayer_UsesOnlyLocalPlayersCharacterAndRelics()
+    {
+        const string json = """
+        {
+          "start_time": 1700000002,
+          "run_time": 1200,
+          "ascension": 5,
+          "win": true,
+          "game_mode": "standard",
+          "players": [
+            {
+              "id": 99,
+              "character": "CHARACTER.IRONCLAD",
+              "badges": [{}],
+              "relics": [{ "id": "RELIC.BURNING_BLOOD" }, { "id": "RELIC.LANTERN" }],
+              "deck": [{}, {}]
+            },
+            {
+              "id": 42,
+              "character": "CHARACTER.DEFECT",
+              "badges": [{}, {}],
+              "relics": [{ "id": "RELIC.CRACKED_CORE" }, { "id": "RELIC.ANCHOR" }],
+              "deck": [{}, {}, {}]
+            }
+          ],
+          "map_point_history": [[{}]]
+        }
+        """;
+
+        var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["IRONCLAD"] = "The Ironclad",
+            ["DEFECT"] = "The Defect"
+        };
+
+        RunSummary summary = FastRunSummaryParser.Parse("coop.run", json, 42, names);
+
+        Assert.Equal("DEFECT", summary.PrimaryCharacterId);
+        Assert.Equal("The Defect", summary.PrimaryCharacterName);
+        Assert.Equal(2, summary.PlayerCount);
+        Assert.Equal(2, summary.BadgeCount);
+        Assert.Equal(2, summary.RelicCount);
+        Assert.Equal(3, summary.CardCount);
+        Assert.Contains("CRACKED_CORE", summary.PlayerRelicIds);
+        Assert.Contains("ANCHOR", summary.PlayerRelicIds);
+        Assert.DoesNotContain("BURNING_BLOOD", summary.PlayerRelicIds);
+        Assert.DoesNotContain("LANTERN", summary.PlayerRelicIds);
+    }
+
+    [Fact]
+    public void Filters_ByRelics_AllAndAnyModes()
+    {
+        var runs = new[]
+        {
+            MakeRun("both.run", playerRelics: new[] { "BURNING_BLOOD", "ANCHOR", "LANTERN" }),
+            MakeRun("only_anchor.run", playerRelics: new[] { "ANCHOR" }),
+            MakeRun("only_lantern.run", playerRelics: new[] { "LANTERN" }),
+            MakeRun("none.run", playerRelics: new[] { "BURNING_BLOOD" })
+        };
+
+        var state = new RunFilterState { RelicMatchMode = MultiMatchMode.All };
+        state.RequiredRelicIds.Add("anchor");
+        state.RequiredRelicIds.Add("lantern");
+
+        Assert.Equal(new[] { "both.run" }, RunFilterEngine.Apply(runs, state).Select(r => r.FileName));
+
+        state.RelicMatchMode = MultiMatchMode.Any;
+        var anyResult = RunFilterEngine.Apply(runs, state).Select(r => r.FileName).ToHashSet();
+        Assert.Equal(3, anyResult.Count);
+        Assert.Contains("both.run", anyResult);
+        Assert.Contains("only_anchor.run", anyResult);
+        Assert.Contains("only_lantern.run", anyResult);
+    }
+
+    [Fact]
+    public void ClearMoreFilters_PreservesMainScreenFilters()
+    {
+        var state = new RunFilterState
+        {
+            Outcome = OutcomeFilter.Wins,
+            CharacterId = "DEFECT",
+            GameType = GameTypeFilter.Standard,
+            RelicMatchMode = MultiMatchMode.Any
+        };
+        state.RequiredRelicIds.Add("ANCHOR");
+
+        state.ClearMoreFilters();
+
+        Assert.False(state.HasMoreFilters);
+        Assert.Equal(MultiMatchMode.All, state.RelicMatchMode);
+        Assert.Equal(OutcomeFilter.Wins, state.Outcome);
+        Assert.Equal("DEFECT", state.CharacterId);
+        Assert.Equal(GameTypeFilter.Standard, state.GameType);
     }
 }

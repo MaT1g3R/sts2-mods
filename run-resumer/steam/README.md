@@ -3,11 +3,10 @@
 ## Directory layout
 * `workshop.json` -- The config describing the Steam Workshop mod.
 * `description.txt` -- Plain/BBCode copy of the Steam Workshop description for easy editing.
-* `content/` -- Staging directory for the mod files uploaded to Steam Workshop (`RunResumer.dll`, `RunResumer.Core.dll`, `Google.Protobuf.dll`, and `RunResumer.json`, populated automatically by `upload.sh`).
+* `content/` -- Staging directory for the mod files uploaded to Steam Workshop (`RunResumer.dll`, `RunResumer.Core.dll`, `Google.Protobuf.dll`, and `RunResumer.json`, populated automatically by `scripts/steam-upload.sh`).
 * `image.png` -- The preview image shown on the Steam Workshop (must be less than 1MB).
 * `steam_appid.txt` -- Steam App ID for Slay the Spire 2 (`2868840`).
 * `mod_id.txt` -- Created/used by `ModUploader` once the Workshop item exists so subsequent runs update the same item instead of creating a new one.
-* `upload.sh` -- Builds the Release DLLs, runs verification tests, stages `content/`, and uploads via `ModUploader`.
 * `README.md` -- This readme document.
 
 ## Releasing
@@ -19,11 +18,11 @@
 
 ### Initial upload or update
 1. Update the version in `../RunResumer.json` and the `changeNote` (and `visibility` if desired) in `workshop.json`.
-2. Run:
+2. From the repository root, run:
    ```sh
-   ./steam/upload.sh
+   make steam-upload-run-resumer
    ```
-   Pass `--stage-only` to build, test, and stage `steam/content/` without invoking `ModUploader`.
+   (or `./scripts/steam-upload.sh run-resumer`). Use `make steam-prepare-run-resumer` (or `--stage-only`) to build, test, and stage `steam/content/` without invoking `ModUploader`.
 3. On the very first upload (when `mod_id.txt` does not exist yet), `ModUploader` creates a new Steam Workshop item. Save the resulting Workshop ID into `steam/mod_id.txt` if `ModUploader` does not write it automatically, and commit `mod_id.txt`.
 
 ## `workshop.json` Properties

@@ -41,7 +41,7 @@ dotnet run --project tests/RunResumer.Tests/RunResumer.Tests.csproj -c Release
 dotnet build -c Release -p:DeployToMods=true
 
 # Stage (or upload) Steam Workshop release (requires ModUploader on PATH for upload)
-./steam/upload.sh --stage-only
+../scripts/steam-upload.sh run-resumer --stage-only
 
 # Build, test, and package distributable zip (dist/RunResumer-v<version>.zip)
 ./scripts/package.sh

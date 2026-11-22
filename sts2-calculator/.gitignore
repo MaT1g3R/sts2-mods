@@ -1,0 +1,52 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Tt]est[Rr]esults/
+packages/
+
+# Godot
+.godot/
+*.pck
+
+# Machine-specific and local user overrides
+*.user
+*.userosscache
+*.props.user
+*.targets.user
+local.properties
+.env
+.env.*
+*.local
+
+# Visual Studio / Rider / JetBrains / VSCode
+.vs/
+.idea/
+*.sln.docstates
+*.suo
+*.userprefs
+*.DotSettings.user
+.ionide/
+
+# Mono / .NET intermediate and cache files
+*.pidb
+*.booproj
+*.tmp
+*.log
+
+# NuGet Packages
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.assets.json
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Steam Workshop staged build artifacts
+steam/content/*.dll
+steam/content/*.pdb
+steam/content/*.json

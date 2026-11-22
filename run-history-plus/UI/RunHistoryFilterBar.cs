@@ -91,6 +91,7 @@ internal sealed class RunHistoryFilterBar
     private Button? _moreFiltersButton;
     private Control? _emptyStateOverlay;
     private MoreFiltersPanel? _moreFiltersPanel;
+    private SeedCopyController? _seedCopyController;
 
     private int _loadGeneration;
     private bool _indexReady;
@@ -263,6 +264,9 @@ internal sealed class RunHistoryFilterBar
         // Add modal last so it sits above everything else
         _screen.AddChild(_moreFiltersPanel.Root);
 
+        // Click-to-copy seed with hover UX hint
+        _seedCopyController = new SeedCopyController(_screen, () => HistoryRef(_screen)?.Seed, regularFont);
+
         PopulateStaticDropdowns();
     }
 
@@ -403,6 +407,7 @@ internal sealed class RunHistoryFilterBar
         _pendingRefreshRunSelectorAfterIndex = false;
         CloseAllDropdowns();
         _moreFiltersPanel?.Hide();
+        _seedCopyController?.OnSubmenuHidden();
     }
 
     private void PopulateStaticDropdowns()
@@ -949,6 +954,8 @@ internal sealed class RunHistoryFilterBar
 
     public void SyncSelectedRunLabel(int index)
     {
+        _seedCopyController?.OnRunChanged();
+
         if (_runSelectorDropdown == null)
         {
             return;

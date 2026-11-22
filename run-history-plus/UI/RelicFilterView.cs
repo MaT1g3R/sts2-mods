@@ -10,10 +10,10 @@ namespace RunHistoryPlus.UI;
 
 /// <summary>
 /// Relic Filter view inside the More Filters modal.
-/// Displays every relic in the game grouped by rarity (matching STS2's Relic Collection),
+/// Displays seen and unlocked relics grouped by rarity (matching STS2's Relic Collection),
 /// greyed out until selected, with a live search box, All/Any toggle, and native STS2 hover tips.
 /// </summary>
-internal sealed class RelicFilterView
+internal sealed class RelicFilterView : IAdvancedFilterView
 {
     private static readonly RelicRarity[] RarityOrder =
     {
@@ -73,6 +73,7 @@ internal sealed class RelicFilterView
     private readonly Dictionary<string, RelicTile> _tilesById = new(StringComparer.OrdinalIgnoreCase);
 
     private bool _gridBuilt;
+    private ContentVisibility? _builtVisibility;
 
     public Control Root => _root;
 
@@ -178,16 +179,20 @@ internal sealed class RelicFilterView
         RefreshMatchModeButtons();
     }
 
-    public void EnsureBuilt()
+    public void EnsureBuilt(ContentVisibility visibility)
     {
-        if (_gridBuilt)
+        if (_gridBuilt && visibility.MatchesCategory(_builtVisibility, FilterContentCategory.Relic))
         {
             RefreshSelectionVisuals();
             return;
         }
 
+        ClearHoverTips();
+        ClearRelicGrid();
+        _builtVisibility = visibility;
         _gridBuilt = true;
-        BuildRelicGrid();
+        BuildRelicGrid(visibility);
+        ApplySearchFilter(_searchInput.Text);
         RefreshSelectionVisuals();
     }
 
@@ -229,14 +234,32 @@ internal sealed class RelicFilterView
         }
     }
 
-    private void BuildRelicGrid()
+    private void ClearRelicGrid()
+    {
+        foreach (RaritySection section in _sections)
+        {
+            _sectionsHost.RemoveChild(section.Header);
+            section.Header.QueueFree();
+            _sectionsHost.RemoveChild(section.Grid);
+            section.Grid.QueueFree();
+        }
+
+        _sections.Clear();
+        _tilesById.Clear();
+    }
+
+    private void BuildRelicGrid(ContentVisibility visibility)
     {
         List<RelicModel> allRelics;
         try
         {
-            allRelics = ModelDb.AllRelics
-                .GroupBy(r => r.Id.Entry, StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.First())
+            allRelics = visibility
+                .FilterVisible(
+                    FilterContentCategory.Relic,
+                    ModelDb.AllRelics
+                        .GroupBy(r => r.Id.Entry, StringComparer.OrdinalIgnoreCase)
+                        .Select(g => g.First()),
+                    r => r.Id.Entry)
                 .ToList();
         }
         catch (Exception ex)
@@ -447,7 +470,16 @@ internal sealed class RelicFilterView
             visibleTotal += visibleInSection;
         }
 
-        _noSearchResultsLabel.Visible = visibleTotal == 0 && !string.IsNullOrEmpty(trimmed);
+        if (_tilesById.Count == 0)
+        {
+            _noSearchResultsLabel.Text = "No discovered relics yet.";
+            _noSearchResultsLabel.Visible = true;
+        }
+        else
+        {
+            _noSearchResultsLabel.Text = "No relics match your search.";
+            _noSearchResultsLabel.Visible = visibleTotal == 0 && !string.IsNullOrEmpty(trimmed);
+        }
     }
 
     private void UpdateTileVisual(RelicTile tile)

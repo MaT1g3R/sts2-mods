@@ -39,6 +39,7 @@ internal sealed class MoreFiltersPanel
     private readonly Button _activeNavBtn;
     private readonly Button _clearAllBtn;
     private readonly RelicFilterView _relicView;
+    private readonly List<IAdvancedFilterView> _advancedFilterViews = new();
     private readonly ScrollContainer _activeViewRoot;
     private readonly VBoxContainer _activeItemsHost;
 
@@ -55,6 +56,7 @@ internal sealed class MoreFiltersPanel
         _regularFont = GD.Load<Font>(KreonRegularPath);
 
         _relicView = new RelicFilterView(_state, HandleFilterChanged, _boldFont, _regularFont);
+        _advancedFilterViews.Add(_relicView);
 
         _overlay = new Control
         {
@@ -223,14 +225,23 @@ internal sealed class MoreFiltersPanel
 
     public void Show()
     {
-        _relicView.EnsureBuilt();
+        ContentVisibility visibility = ProgressVisibilityProvider.CaptureCurrent();
+        foreach (IAdvancedFilterView view in _advancedFilterViews)
+        {
+            view.EnsureBuilt(visibility);
+        }
+
         RefreshNavAndActiveView();
         _overlay.Visible = true;
     }
 
     public void Hide()
     {
-        _relicView.ClearHoverTips();
+        foreach (IAdvancedFilterView view in _advancedFilterViews)
+        {
+            view.ClearHoverTips();
+        }
+
         _overlay.Visible = false;
     }
 
@@ -255,7 +266,10 @@ internal sealed class MoreFiltersPanel
     {
         if (_overlay.Visible)
         {
-            _relicView.RefreshSelectionVisuals();
+            foreach (IAdvancedFilterView view in _advancedFilterViews)
+            {
+                view.RefreshSelectionVisuals();
+            }
         }
         RefreshNavAndActiveView();
     }
@@ -263,7 +277,10 @@ internal sealed class MoreFiltersPanel
     private void SelectTab(string tabId)
     {
         _activeTab = tabId;
-        _relicView.ClearHoverTips();
+        foreach (IAdvancedFilterView view in _advancedFilterViews)
+        {
+            view.ClearHoverTips();
+        }
         _relicView.Root.Visible = tabId == TabRelics;
         _activeViewRoot.Visible = tabId == TabActive;
 
@@ -289,7 +306,10 @@ internal sealed class MoreFiltersPanel
         }
 
         _state.ClearMoreFilters();
-        _relicView.RefreshSelectionVisuals();
+        foreach (IAdvancedFilterView view in _advancedFilterViews)
+        {
+            view.RefreshSelectionVisuals();
+        }
         RefreshNavAndActiveView();
         _onMoreFiltersChanged();
     }

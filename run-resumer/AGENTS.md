@@ -28,23 +28,24 @@ RunResumer captures compact per-floor snapshots during singleplayer Slay the Spi
 
 ## Build, Test, and Deploy
 
-Set `STS2_GAME_DIR` (or `-p:Sts2GameDir=...`) if the game is not at `$HOME/.steam/steam/steamapps/common/Slay the Spire 2`.
+Set `STS2_GAME_DIR` if the game is not at `$HOME/.steam/steam/steamapps/common/Slay the Spire 2`. Run these targets from the repository root using the top-level `Makefile`:
 
 ```bash
-# Build
-dotnet build -c Release
+# Build and run verification tests without deploying
+# (isolated loader GetTypes + icon resource + 18 Harmony targets/fields + 50-floor round-trip + .zip share/import/delete checks)
+make build-run-resumer
 
-# Run verification tests (isolated loader GetTypes + icon resource + 18 Harmony targets/fields + 50-floor round-trip + .zip share/import/delete checks)
-dotnet run --project tests/RunResumer.Tests/RunResumer.Tests.csproj -c Release
+# Build, test, and deploy to <game>/mods/RunResumer/
+make deploy-run-resumer
 
-# Build and deploy to <game>/mods/RunResumer/
-dotnet build -c Release -p:DeployToMods=true
+# Prepare (stage) Steam Workshop release in run-resumer/steam/content/
+make steam-prepare-run-resumer
 
-# Stage (or upload) Steam Workshop release (requires ModUploader on PATH for upload)
-../scripts/steam-upload.sh run-resumer --stage-only
+# Upload Steam Workshop release (requires ModUploader on PATH and Steam running)
+make steam-upload-run-resumer
 
-# Build, test, and package distributable zip (dist/RunResumer-v<version>.zip)
-./scripts/package.sh
+# Build, test, and package distributable zip (run-resumer/dist/RunResumer-v<version>.zip)
+./run-resumer/scripts/package.sh
 ```
 
 ## Guidelines & Invariants

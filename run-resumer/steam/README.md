@@ -3,7 +3,7 @@
 ## Directory layout
 * `workshop.json` -- The config describing the Steam Workshop mod.
 * `description.txt` -- Plain/BBCode copy of the Steam Workshop description for easy editing.
-* `content/` -- Staging directory for the mod files uploaded to Steam Workshop (`RunResumer.dll`, `RunResumer.Core.dll`, `Google.Protobuf.dll`, and `RunResumer.json`, populated automatically by `scripts/steam-upload.sh`).
+* `content/` -- Staging directory for the mod files uploaded to Steam Workshop (`RunResumer.dll`, `RunResumer.Core.dll`, `Google.Protobuf.dll`, and `RunResumer.json`, populated automatically by `make steam-prepare-run-resumer`).
 * `image.png` -- The preview image shown on the Steam Workshop (must be less than 1MB).
 * `steam_appid.txt` -- Steam App ID for Slay the Spire 2 (`2868840`).
 * `mod_id.txt` -- Created/used by `ModUploader` once the Workshop item exists so subsequent runs update the same item instead of creating a new one.

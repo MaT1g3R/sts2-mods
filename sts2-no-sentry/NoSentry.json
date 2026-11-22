@@ -1,0 +1,12 @@
+{
+  "id": "NoSentry",
+  "name": "No Sentry",
+  "author": "vmService",
+  "description": "Completely disables Sentry error and crash reporting.",
+  "version": "1.0.0",
+  "has_pck": false,
+  "has_dll": true,
+  "dependencies": [],
+  "affects_gameplay": false,
+  "min_game_version": "v0.113.1"
+}

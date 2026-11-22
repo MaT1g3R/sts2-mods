@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>NoSentry</AssemblyName>
+    <RootNamespace>NoSentry</RootNamespace>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <!-- Override with -p:Sts2GameDir=... or the STS2_GAME_DIR environment variable. -->
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == ''">$(STS2_GAME_DIR)</Sts2GameDir>
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == ''">$(HOME)/.steam/steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+    <Sts2DataDir>$(Sts2GameDir)/data_sts2_linuxbsd_x86_64</Sts2DataDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="sts2">
+      <HintPath>$(Sts2DataDir)/sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2DataDir)/GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(Sts2DataDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sentry">
+      <HintPath>$(Sts2DataDir)/Sentry.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sentry.Godot">
+      <HintPath>$(Sts2DataDir)/Sentry.Godot.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- dotnet build -c Release -p:DeployToMods=true -->
+  <Target Name="DeployToMods" AfterTargets="Build" Condition="'$(DeployToMods)' == 'true'">
+    <PropertyGroup>
+      <ModDestDir>$(Sts2GameDir)/mods/$(AssemblyName)</ModDestDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(ModDestDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDestDir)" />
+    <Copy SourceFiles="$(ProjectDir)$(AssemblyName).json"
+          DestinationFolder="$(ModDestDir)"
+          Condition="Exists('$(ProjectDir)$(AssemblyName).json')" />
+    <Message Importance="High" Text="Deployed $(AssemblyName) to $(ModDestDir)" />
+  </Target>
+</Project>

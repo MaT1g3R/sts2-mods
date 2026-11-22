@@ -2,6 +2,7 @@
 
 Monorepo for Slay the Spire 2 mods:
 
+- [`run-history-plus/`](./run-history-plus) — Run History Plus (`RunHistoryPlus`)
 - [`run-resumer/`](./run-resumer) — Run Resumer (`RunResumer`)
 - [`sts2-calculator/`](./sts2-calculator) — In-game Calculator (`Sts2Calculator`)
 - [`sts2-no-sentry/`](./sts2-no-sentry) — Disable Sentry / Godot GDExtension shutdown workaround (`NoSentry`)

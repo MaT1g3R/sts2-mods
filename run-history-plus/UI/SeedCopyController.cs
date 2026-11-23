@@ -28,6 +28,8 @@ internal sealed class SeedCopyController
     private readonly NRunHistory _screen;
     private readonly Func<string?> _getCurrentSeed;
     private readonly MegaRichTextLabel? _seedLabel;
+    private readonly Control? _seedParent;
+    private readonly Control? _hitboxHost;
     private readonly Control? _hitbox;
     private readonly PanelContainer _tooltipPanel;
     private readonly Label _tooltipLabel;
@@ -69,9 +71,12 @@ internal sealed class SeedCopyController
         _seedLabel = _screen.GetNodeOrNull<MegaRichTextLabel>("%SeedLabel");
         if (_seedLabel != null)
         {
-            // Use an expanded child hitbox rather than the narrow RichTextLabel bounds so the
-            // entire right-aligned "Seed: ..." text (which overflows left with clip_contents=false)
-            // plus generous padding is easy to hover and click, without altering the cursor shape.
+            // Place the hitbox as the last child of TopSection (the parent of RightAlignedStuff)
+            // so it sits above LeftAlignedStuff in hit-test order and covers the full width of the
+            // right-aligned "Seed: ..." text that overflows left of RightAlignedStuff.
+            _seedParent = _seedLabel.GetParent() as Control;
+            _hitboxHost = _seedParent?.GetParent() as Control ?? _seedLabel;
+
             _hitbox = new Control
             {
                 Name = "RunHistoryPlusSeedHitbox",
@@ -80,8 +85,18 @@ internal sealed class SeedCopyController
             _hitbox.MouseEntered += OnSeedMouseEntered;
             _hitbox.MouseExited += OnSeedMouseExited;
             _hitbox.GuiInput += OnSeedGuiInput;
-            _seedLabel.AddChild(_hitbox);
+            _hitboxHost.AddChild(_hitbox);
+
             _seedLabel.Resized += UpdateHitboxBounds;
+            if (_seedParent != null)
+            {
+                _seedParent.Resized += UpdateHitboxBounds;
+            }
+            if (_hitboxHost != _seedLabel)
+            {
+                _hitboxHost.Resized += UpdateHitboxBounds;
+            }
+
             Callable.From(UpdateHitboxBounds).CallDeferred();
         }
         else
@@ -94,6 +109,7 @@ internal sealed class SeedCopyController
     {
         _copiedGeneration++;
         ApplyDefaultTooltipAppearance();
+        UpdateHitboxBounds();
         Callable.From(UpdateHitboxBounds).CallDeferred();
 
         if (_isHovered && HasCopyableSeed())
@@ -177,16 +193,49 @@ internal sealed class SeedCopyController
 
         float labelWidth = _seedLabel.Size.X;
         float labelHeight = _seedLabel.Size.Y;
-        float contentWidth = _seedLabel.GetContentWidth();
-        float contentHeight = _seedLabel.GetContentHeight();
+        float textWidth = MeasureRenderedSeedWidth();
+        float textHeight = Math.Max(labelHeight, _seedLabel.GetContentHeight());
 
-        float left = Math.Min(0f, labelWidth - contentWidth) - HitboxPadLeft;
-        float right = labelWidth + HitboxPadRight;
-        float top = -HitboxPadVertical;
-        float bottom = Math.Max(labelHeight, contentHeight) + HitboxPadVertical;
+        Vector2 originOffset = (_hitboxHost != null && _hitboxHost != _seedLabel && _seedParent != null && GodotObject.IsInstanceValid(_seedParent))
+            ? _seedParent.Position + _seedLabel.Position
+            : Vector2.Zero;
+
+        float seedRight = originOffset.X + labelWidth;
+        float left = Math.Min(originOffset.X, seedRight - textWidth) - HitboxPadLeft;
+        float right = seedRight + HitboxPadRight;
+        float top = originOffset.Y - HitboxPadVertical;
+        float bottom = originOffset.Y + textHeight + HitboxPadVertical;
 
         _hitbox.Position = new Vector2(left, top);
         _hitbox.Size = new Vector2(Math.Max(1f, right - left), Math.Max(1f, bottom - top));
+    }
+
+    private float MeasureRenderedSeedWidth()
+    {
+        if (_seedLabel == null)
+        {
+            return 0f;
+        }
+
+        float contentWidth = _seedLabel.GetContentWidth();
+        string parsedText = _seedLabel.GetParsedText();
+        if (string.IsNullOrEmpty(parsedText))
+        {
+            return contentWidth;
+        }
+
+        Font? font = _seedLabel.GetThemeFont("normal_font");
+        int fontSize = _seedLabel.GetThemeFontSize("normal_font_size");
+        if (fontSize <= 0)
+        {
+            fontSize = 24;
+        }
+
+        float measuredWidth = font != null
+            ? font.GetStringSize(parsedText, HorizontalAlignment.Left, -1f, fontSize).X
+            : parsedText.Length * (fontSize * 0.6f);
+
+        return Math.Max(contentWidth, measuredWidth);
     }
 
     private void ShowCopiedFeedback()

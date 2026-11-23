@@ -7,13 +7,17 @@ namespace RunHistoryPlus.UI;
 
 /// <summary>
 /// Makes the Seed label on <see cref="NRunHistory"/> clickable to copy the run seed to the
-/// system clipboard, with a pointing-hand cursor, colour highlight, and floating hover hint.
+/// system clipboard, with a colour highlight and floating hover hint.
 /// </summary>
 internal sealed class SeedCopyController
 {
     private const string HoverHintText = "Click to copy seed";
     private const string CopiedHintText = "Copied!";
     private const double CopiedFeedbackSeconds = 1.5;
+
+    private const float HitboxPadLeft = 16f;
+    private const float HitboxPadRight = 8f;
+    private const float HitboxPadVertical = 4f;
 
     private static readonly Color CreamColor = new("FFF6E2");
     private static readonly Color GoldColor = new("EFC851");
@@ -24,6 +28,7 @@ internal sealed class SeedCopyController
     private readonly NRunHistory _screen;
     private readonly Func<string?> _getCurrentSeed;
     private readonly MegaRichTextLabel? _seedLabel;
+    private readonly Control? _hitbox;
     private readonly PanelContainer _tooltipPanel;
     private readonly Label _tooltipLabel;
 
@@ -64,11 +69,20 @@ internal sealed class SeedCopyController
         _seedLabel = _screen.GetNodeOrNull<MegaRichTextLabel>("%SeedLabel");
         if (_seedLabel != null)
         {
-            _seedLabel.MouseFilter = Control.MouseFilterEnum.Pass;
-            _seedLabel.MouseDefaultCursorShape = Control.CursorShape.PointingHand;
-            _seedLabel.MouseEntered += OnSeedMouseEntered;
-            _seedLabel.MouseExited += OnSeedMouseExited;
-            _seedLabel.GuiInput += OnSeedGuiInput;
+            // Use an expanded child hitbox rather than the narrow RichTextLabel bounds so the
+            // entire right-aligned "Seed: ..." text (which overflows left with clip_contents=false)
+            // plus generous padding is easy to hover and click, without altering the cursor shape.
+            _hitbox = new Control
+            {
+                Name = "RunHistoryPlusSeedHitbox",
+                MouseFilter = Control.MouseFilterEnum.Pass
+            };
+            _hitbox.MouseEntered += OnSeedMouseEntered;
+            _hitbox.MouseExited += OnSeedMouseExited;
+            _hitbox.GuiInput += OnSeedGuiInput;
+            _seedLabel.AddChild(_hitbox);
+            _seedLabel.Resized += UpdateHitboxBounds;
+            Callable.From(UpdateHitboxBounds).CallDeferred();
         }
         else
         {
@@ -80,6 +94,7 @@ internal sealed class SeedCopyController
     {
         _copiedGeneration++;
         ApplyDefaultTooltipAppearance();
+        Callable.From(UpdateHitboxBounds).CallDeferred();
 
         if (_isHovered && HasCopyableSeed())
         {
@@ -145,12 +160,33 @@ internal sealed class SeedCopyController
         {
             DisplayServer.ClipboardSet(seed);
             ShowCopiedFeedback();
-            _seedLabel?.AcceptEvent();
+            _hitbox?.AcceptEvent();
         }
         catch (Exception ex)
         {
             Log.Warn($"[RunHistoryPlus] Failed to copy seed to clipboard: {ex.Message}");
         }
+    }
+
+    private void UpdateHitboxBounds()
+    {
+        if (_seedLabel == null || _hitbox == null || !GodotObject.IsInstanceValid(_seedLabel) || !GodotObject.IsInstanceValid(_hitbox))
+        {
+            return;
+        }
+
+        float labelWidth = _seedLabel.Size.X;
+        float labelHeight = _seedLabel.Size.Y;
+        float contentWidth = _seedLabel.GetContentWidth();
+        float contentHeight = _seedLabel.GetContentHeight();
+
+        float left = Math.Min(0f, labelWidth - contentWidth) - HitboxPadLeft;
+        float right = labelWidth + HitboxPadRight;
+        float top = -HitboxPadVertical;
+        float bottom = Math.Max(labelHeight, contentHeight) + HitboxPadVertical;
+
+        _hitbox.Position = new Vector2(left, top);
+        _hitbox.Size = new Vector2(Math.Max(1f, right - left), Math.Max(1f, bottom - top));
     }
 
     private void ShowCopiedFeedback()
@@ -201,18 +237,17 @@ internal sealed class SeedCopyController
             return;
         }
 
+        UpdateHitboxBounds();
+
         _tooltipPanel.ResetSize();
         Vector2 tooltipSize = _tooltipPanel.GetCombinedMinimumSize();
-        Rect2 seedRect = _seedLabel.GetGlobalRect();
+        Rect2 anchorRect = _hitbox != null && GodotObject.IsInstanceValid(_hitbox)
+            ? _hitbox.GetGlobalRect()
+            : _seedLabel.GetGlobalRect();
 
-        float contentWidth = _seedLabel.GetContentWidth();
-        float textLeftX = contentWidth > 0f
-            ? seedRect.End.X - contentWidth
-            : seedRect.Position.X;
-
-        const float gap = 10f;
-        float x = textLeftX - tooltipSize.X - gap;
-        float y = seedRect.Position.Y + (seedRect.Size.Y - tooltipSize.Y) * 0.5f;
+        const float gap = 6f;
+        float x = anchorRect.Position.X - tooltipSize.X - gap;
+        float y = anchorRect.Position.Y + (anchorRect.Size.Y - tooltipSize.Y) * 0.5f;
 
         Rect2 viewportRect = _screen.GetViewportRect();
         x = Mathf.Clamp(x, 8f, Math.Max(8f, viewportRect.Size.X - tooltipSize.X - 8f));

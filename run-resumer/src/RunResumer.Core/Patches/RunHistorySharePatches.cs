@@ -93,7 +93,7 @@ internal static class RunHistoryShareUiHelper
                 existingShareBtn.Visible = false;
             }
 
-            PackedScene? buttonScene = PreloadManager.Cache.GetScene(ShareButtonScenePath);
+            PackedScene? buttonScene = ResourceLoader.Load<PackedScene>(ShareButtonScenePath, null, ResourceLoader.CacheMode.Reuse);
             if (buttonScene == null)
             {
                 Log.Warn("[RunResumer] Could not load share_button.tscn for Export/Import buttons.");

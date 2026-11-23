@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Daily;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
@@ -108,6 +110,8 @@ internal static class LoadMainMenuPatch
 [HarmonyPatch(typeof(NMainMenu), nameof(NMainMenu._Ready))]
 internal static class MainMenuReadyReturnPatch
 {
+    private const int MaxPreloadWaitFrames = 600;
+
     public static void Postfix(NMainMenu __instance)
     {
         long? pendingStartTime = ReplaySession.PendingReturnStartTime;
@@ -119,24 +123,129 @@ internal static class MainMenuReadyReturnPatch
         ReplaySession.PendingReturnStartTime = null;
         long targetStartTime = pendingStartTime.Value;
 
-        Callable.From(() =>
-        {
-            try
-            {
-                if (!GodotObject.IsInstanceValid(__instance) || !NRunHistory.CanBeShown())
-                {
-                    return;
-                }
+        TaskHelper.RunSafely(ReopenRunHistoryWhenPreloadedAsync(__instance, targetStartTime));
+    }
 
-                __instance.OpenCompendiumSubmenu();
-                NRunHistory historyScreen = __instance.SubmenuStack.PushSubmenuType<NRunHistory>();
-                RunHistoryShareUiHelper.SelectRunInHistory(historyScreen, targetStartTime);
-            }
-            catch (Exception ex)
+    private static async Task ReopenRunHistoryWhenPreloadedAsync(NMainMenu mainMenu, long targetStartTime)
+    {
+        try
+        {
+            if (!await WaitOneProcessFrameAsync(mainMenu))
             {
-                Log.Error($"[RunResumer] Failed to reopen Run History after replay: {ex}");
+                return;
             }
-        }).CallDeferred();
+
+            // Wait for background Common/MainMenu preloading to cache the compendium and
+            // run history scenes so NRunHistory.Create() does not record a cache miss in
+            // AssetCache._missedCacheAssets (which LoadRoomAssets would later dispose after
+            // NRunSubmenuStack binds _runHistoryScreenScene).
+            if (PreloadManager.Enabled)
+            {
+                for (int i = 0; i < MaxPreloadWaitFrames && !AreHistoryPreloadAssetsReady(); i++)
+                {
+                    if (!GodotObject.IsInstanceValid(mainMenu)
+                        || !mainMenu.IsInsideTree()
+                        || ReplaySession.IsInActiveRun()
+                        || mainMenu.SubmenuStack.SubmenusOpen)
+                    {
+                        return;
+                    }
+
+                    if (!await WaitOneProcessFrameAsync(mainMenu))
+                    {
+                        return;
+                    }
+                }
+            }
+
+            if (!GodotObject.IsInstanceValid(mainMenu)
+                || !mainMenu.IsInsideTree()
+                || ReplaySession.IsInActiveRun()
+                || mainMenu.SubmenuStack.SubmenusOpen
+                || !NRunHistory.CanBeShown())
+            {
+                return;
+            }
+
+            mainMenu.OpenCompendiumSubmenu();
+            NRunHistory historyScreen = mainMenu.SubmenuStack.PushSubmenuType<NRunHistory>();
+            RunHistoryShareUiHelper.SelectRunInHistory(historyScreen, targetStartTime);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"[RunResumer] Failed to reopen Run History after replay: {ex}");
+        }
+    }
+
+    private static async Task<bool> WaitOneProcessFrameAsync(NMainMenu mainMenu)
+    {
+        if (!GodotObject.IsInstanceValid(mainMenu) || !mainMenu.IsInsideTree())
+        {
+            return false;
+        }
+
+        SceneTree? tree = mainMenu.GetTree();
+        if (tree == null)
+        {
+            return false;
+        }
+
+        await mainMenu.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+        return GodotObject.IsInstanceValid(mainMenu) && mainMenu.IsInsideTree();
+    }
+
+    private static bool AreHistoryPreloadAssetsReady()
+    {
+        foreach (string path in NCompendiumSubmenu.AssetPaths)
+        {
+            if (!PreloadManager.Cache.ContainsKey(path))
+            {
+                return false;
+            }
+        }
+
+        foreach (string path in NRunHistory.AssetPaths)
+        {
+            if (!PreloadManager.Cache.ContainsKey(path))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+[HarmonyPatch(typeof(NRunSubmenuStack), nameof(NRunSubmenuStack.GetSubmenuType), typeof(Type))]
+internal static class RunSubmenuStackGetSubmenuTypePatch
+{
+    private const string RunHistoryScenePath = "res://scenes/screens/run_history_screen/run_history.tscn";
+
+    private static readonly AccessTools.FieldRef<NRunSubmenuStack, PackedScene> RunHistoryScreenSceneRef =
+        AccessTools.FieldRefAccess<NRunSubmenuStack, PackedScene>("_runHistoryScreenScene");
+
+    private static readonly AccessTools.FieldRef<NRunSubmenuStack, NRunHistory?> RunHistoryScreenRef =
+        AccessTools.FieldRefAccess<NRunSubmenuStack, NRunHistory?>("_runHistoryScreen");
+
+    public static void Prefix(NRunSubmenuStack __instance, Type type)
+    {
+        if (type != typeof(NRunHistory) || RunHistoryScreenRef(__instance) != null)
+        {
+            return;
+        }
+
+        PackedScene? scene = RunHistoryScreenSceneRef(__instance);
+        if (scene != null && GodotObject.IsInstanceValid(scene))
+        {
+            return;
+        }
+
+        PackedScene? reloaded = ResourceLoader.Load<PackedScene>(RunHistoryScenePath, null, ResourceLoader.CacheMode.Reuse);
+        if (reloaded != null && GodotObject.IsInstanceValid(reloaded))
+        {
+            RunHistoryScreenSceneRef(__instance) = reloaded;
+            Log.Info("[RunResumer] Reloaded disposed NRunSubmenuStack._runHistoryScreenScene");
+        }
     }
 }
 

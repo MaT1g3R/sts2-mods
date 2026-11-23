@@ -3,7 +3,7 @@
   "name": "Run Resumer",
   "author": "vmService",
   "description": "Saves compact Protobuf snapshots per floor and lets you right-click any floor in Run History to practice from that floor.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "has_pck": false,
   "has_dll": true,
   "dependencies": [],

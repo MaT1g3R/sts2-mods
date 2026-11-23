@@ -92,7 +92,12 @@ internal static class MapPointHistoryHoverTipHintPatch
 
             string text;
             Color color;
-            if (hasSnapshot)
+            if (hasSnapshot && ReplaySession.IsInActiveRun())
+            {
+                text = "Return to Main Menu to replay";
+                color = new Color(0.68f, 0.66f, 0.62f);
+            }
+            else if (hasSnapshot)
             {
                 text = $"Right-click to replay from Floor {entry.FloorNum}";
                 color = new Color(0.937255f, 0.784314f, 0.317647f);

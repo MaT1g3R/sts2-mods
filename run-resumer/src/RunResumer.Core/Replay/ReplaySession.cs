@@ -28,10 +28,21 @@ internal static class ReplaySession
 
     public static long? PendingReturnStartTime { get; set; }
 
+    public static bool IsInActiveRun()
+    {
+        return RunManager.Instance.IsInProgress || NRun.Instance != null;
+    }
+
     public static void TryLaunchFromHistory(RunHistory history, int floorNum)
     {
         if (_isLaunching)
         {
+            return;
+        }
+
+        if (IsInActiveRun())
+        {
+            NGame.Instance?.AddChildSafely(NFullscreenTextVfx.Create("Return to the Main Menu to launch a replay."));
             return;
         }
 
@@ -117,9 +128,8 @@ internal static class ReplaySession
     private static async Task LaunchReplayAsync(SerializableRun serializableRun, long runStartTime, int floorNum)
     {
         _isLaunching = true;
-        bool wasInRun = RunManager.Instance.IsInProgress;
         NGame? game = NGame.Instance;
-        if (game == null)
+        if (game == null || IsInActiveRun())
         {
             _isLaunching = false;
             return;
@@ -138,11 +148,6 @@ internal static class ReplaySession
 
             SfxCmd.Play(transitionSfx);
             await game.Transition.FadeOut(0.8f, transitionPath);
-
-            if (wasInRun)
-            {
-                RunManager.Instance.CleanUp(graceful: true);
-            }
 
             IsActive = true;
             ReplayedRunStartTime = runStartTime;

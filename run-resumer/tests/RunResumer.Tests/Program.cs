@@ -121,12 +121,14 @@ internal static class Program
             checkedPatches++;
         }
 
-        Assert(checkedPatches == 18, $"Expected 18 patch classes, checked {checkedPatches}");
+        Assert(checkedPatches == 19, $"Expected 19 patch classes, checked {checkedPatches}");
         Assert(AccessTools.Field(typeof(SaveManager), "_saveStore") != null, "SaveManager._saveStore missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_history") != null, "NRunHistory._history missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_runNames") != null, "NRunHistory._runNames missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_index") != null, "NRunHistory._index missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NSubmenu), "_stack") != null, "NSubmenu._stack missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.NRunSubmenuStack), "_runHistoryScreenScene") != null, "NRunSubmenuStack._runHistoryScreenScene missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.NRunSubmenuStack), "_runHistoryScreen") != null, "NRunSubmenuStack._runHistoryScreen missing");
         Console.WriteLine($"[PASS] Verified all {checkedPatches} Harmony patch targets resolve against sts2.dll");
     }
 

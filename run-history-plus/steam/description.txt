@@ -5,7 +5,8 @@ Features:
 [*] [b]Filter runs[/b] by Outcome (Wins and Losses, Wins, Losses), Character, and Game Type (Standard, Daily, Blitz, Dread, Custom)
 [*] [b]Sort runs[/b] by Date, Badge Count, Run Time, Relic Count, or Card Count in Descending or Ascending order
 [*] [b]Quick Run Selector[/b] dropdown at the top of Run History showing date/time, character, ascension/game mode, and colour-coded Win/Loss so you can jump directly to any run
-[*] [b]More Filters menu with Relic Filter[/b]: browse all relics grouped by rarity, search by name, select one or more relics with Match All / Match Any, view and remove active filters, or clear all additional filters at once
+[*] [b]More Filters menu with Relic Filter[/b]: browse discovered relics grouped by rarity, search by name, select one or more relics with Match All / Match Any, view and remove active filters, or clear all additional filters at once
+[*] [b]Click-to-copy seed[/b]: hover and click any run's seed to copy it to your clipboard
 [*] [b]Keyboard navigation[/b]: use the Left and Right arrow keys to browse through runs
 [/list]
 

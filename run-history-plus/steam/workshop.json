@@ -2,7 +2,7 @@
   "title": "Run History Plus",
   "description": "Enhanced filtering, sorting, and navigation for the Slay the Spire 2 Run History screen.\n\nFeatures:\n[list]\n[*] [b]Filter runs[/b] by Outcome (Wins and Losses, Wins, Losses), Character, and Game Type (Standard, Daily, Blitz, Dread, Custom)\n[*] [b]Sort runs[/b] by Date, Badge Count, Run Time, Relic Count, or Card Count in Descending or Ascending order\n[*] [b]Quick Run Selector[/b] dropdown at the top of Run History showing date/time, character, ascension/game mode, and colour-coded Win/Loss so you can jump directly to any run\n[*] [b]More Filters menu with Relic Filter[/b]: browse discovered relics grouped by rarity, search by name, select one or more relics with Match All / Match Any, view and remove active filters, or clear all additional filters at once\n[*] [b]Click-to-copy seed[/b]: hover and click any run's seed to copy it to your clipboard\n[*] [b]Keyboard navigation[/b]: use the Left and Right arrow keys to browse through runs\n[/list]\n\nInspired by [url=https://github.com/modargo/RunHistoryPlus]Run History Plus[/url] for Slay the Spire 1 by modargo.",
   "visibility": "public",
-  "changeNote": "v1.1.0 - Hide unseen/locked relics in Relic Filter and add click-to-copy run seed",
+  "changeNote": "v1.1.1 - Rebuild for Slay the Spire 2 v0.114.0",
   "tags": ["qol"],
   "dependencies": []
 }

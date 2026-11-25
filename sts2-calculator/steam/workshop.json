@@ -2,7 +2,7 @@
   "title": "Calculator",
   "description": "An in-game calculator accessible from the top menu bar.\n\nFeatures:\n[list]\n[*] Draggable floating calculator panel with live expression evaluation\n[*] Supports [b]+[/b], [b]-[/b], [b]*[/b], [b]x[/b], [b]/[/b], parentheses [b]( )[/b], unary minus, and [b]floor()[/b], [b]fl()[/b], [b]int()[/b] functions\n[*] Quick damage multiplier shortcuts ([b]x0.75[/b], [b]x1.5[/b], [b]x1.75[/b])\n[*] Collapsible keypad for compact keyboard-only mode and recent calculation history\n[*] Keyboard input guard prevents number keys and game hotkeys from triggering while typing; clicking outside releases focus automatically\n[*] Works in multiplayer even if other players do not have it installed\n[/list]",
   "visibility": "public",
-  "changeNote": "v1.0.0 - Initial Steam Workshop release",
+  "changeNote": "v1.0.1 - Rebuild for Slay the Spire 2 v0.114.0",
   "tags": ["qol"],
   "dependencies": []
 }

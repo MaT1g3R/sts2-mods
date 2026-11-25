@@ -3,7 +3,7 @@
   "name": "No Sentry",
   "author": "vmService",
   "description": "Completely disables Sentry error and crash reporting.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "has_pck": false,
   "has_dll": true,
   "dependencies": [],

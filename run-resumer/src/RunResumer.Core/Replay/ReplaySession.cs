@@ -7,7 +7,6 @@ using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Audio;
-using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
@@ -138,7 +137,6 @@ internal static class ReplaySession
         try
         {
             Log.Info($"[RunResumer] Launching practice replay for run {runStartTime} at Floor {floorNum}");
-            NHotkeyManager.Instance?.ClearHotkeys();
             NAudioManager.Instance?.StopMusic();
             NRunMusicController.Instance?.StopMusic();
 

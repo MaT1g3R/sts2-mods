@@ -2,7 +2,7 @@
   "title": "Run Resumer",
   "description": "Replay any floor from your past single player runs.\n\nFeatures:\n[list]\n[*] [b]Right-click any floor in Run History to replay[/b]. Jump straight back to the start of any floor.\n[*] [b]Export and import runs to share with friends[/b]. Save a run as a .zip file from Run History and send it to friends, or load theirs with the Import button or by dragging the .zip file onto the game window.\n[*] [b]Much smaller file sizes[/b]: takes up far less disk space than the Slay the Spire 1 Run Resumer.\n[/list]\n\nInspired by [url=https://github.com/Alchyr/RunResumer]RunResumer[/url] for Slay the Spire 1 by Alchyr.",
   "visibility": "public",
-  "changeNote": "v1.1.1 - Update for Slay the Spire 2 v0.114.0 compatibility",
+  "changeNote": "v1.1.3 - Update for Slay the Spire 2 v0.114.0 compatibility",
   "tags": ["qol"],
   "dependencies": []
 }

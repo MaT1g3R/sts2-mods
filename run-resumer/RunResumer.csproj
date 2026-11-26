@@ -3,6 +3,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <AssemblyName>RunResumer</AssemblyName>
     <RootNamespace>RunResumer</RootNamespace>
+    <Version>1.1.2</Version>
     <Nullable>enable</Nullable>
     <LangVersion>12.0</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>

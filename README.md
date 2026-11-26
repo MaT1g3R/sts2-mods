@@ -31,6 +31,12 @@ make steam-prepare-<mod>  # or: make steam-prepare MOD=<mod>
 
 # 4. Upload a mod to Steam Workshop (requires ModUploader on PATH and Steam running)
 make steam-upload-<mod>   # or: make steam-upload MOD=<mod>
+
+# 5. Inspect or bump SemVer versions (manifest JSON, .csproj <Version>, and workshop.json changeNote)
+make versions
+make bump BUMP=patch MODS="run-history-plus run-resumer"
+make bump-all BUMP=minor NOTE="Support STS2 v0.115.0" DRY_RUN=1
+./scripts/bump-version.py patch run-history-plus sts2-calculator
 ```
 
 ### Options

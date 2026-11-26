@@ -3,6 +3,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <AssemblyName>NoSentry</AssemblyName>
     <RootNamespace>NoSentry</RootNamespace>
+    <Version>1.0.1</Version>
     <Nullable>enable</Nullable>
     <LangVersion>12.0</LangVersion>
     <!-- Override with -p:Sts2GameDir=... or the STS2_GAME_DIR environment variable. -->

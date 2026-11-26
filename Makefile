@@ -23,11 +23,12 @@ DEPLOY_TARGETS        := $(addprefix deploy-,$(MODS))
 STEAM_PREPARE_TARGETS := $(addprefix steam-prepare-,$(MODS))
 STEAM_UPLOAD_TARGETS  := $(addprefix steam-upload-,$(MODS))
 
-.PHONY: help list \
+.PHONY: help list versions \
         build build-all $(BUILD_TARGETS) \
         deploy deploy-all $(DEPLOY_TARGETS) \
         steam-prepare $(STEAM_PREPARE_TARGETS) \
-        steam-upload $(STEAM_UPLOAD_TARGETS)
+        steam-upload $(STEAM_UPLOAD_TARGETS) \
+        bump bump-all
 
 define REQUIRE_MOD
 	@if [ -z "$(MOD)" ]; then \
@@ -64,14 +65,23 @@ help:
 	@echo "  steam-upload MOD=<mod>    Same as steam-upload-<mod>"
 	@echo "  build-all                 Build and test all detected mods without deploying"
 	@echo "  deploy-all                Build, test, and deploy all detected mods"
+	@echo "  bump BUMP=<spec> MODS='...' Bump SemVer version for one or more mods (also accepts MOD=<mod>)"
+	@echo "  bump-all BUMP=<spec>      Bump SemVer version for all detected mods"
+	@echo "  versions                  Show current versions of all detected mods"
 	@echo "  list                      Print auto-detected mod names"
 	@echo ""
 	@echo "Variables:"
 	@echo "  CONFIGURATION=$(CONFIGURATION)  Build configuration (Release or Debug)"
 	@echo "  STS2_GAME_DIR=...      Optional override for Slay the Spire 2 install path"
+	@echo "  BUMP=...               SemVer bump kind (major|minor|patch|pre*|prerelease) or explicit X.Y.Z"
+	@echo "  NOTE=...               Optional Steam Workshop changeNote for bump targets"
+	@echo "  DRY_RUN=1              Preview version bump without modifying files"
 
 list:
 	@for m in $(MODS); do echo "$$m"; done
+
+versions:
+	@python3 scripts/bump-version.py --list
 
 # ------------------------------------------------------------------------------
 # 1. Build and test a mod without deploying
@@ -160,3 +170,31 @@ steam-upload:
 
 $(STEAM_UPLOAD_TARGETS): steam-upload-%:
 	@CONFIGURATION="$(CONFIGURATION)" sh scripts/steam-upload.sh "$*"
+
+# ------------------------------------------------------------------------------
+# 5. Bump SemVer versions across manifests, .csproj files, and workshop metadata
+# ------------------------------------------------------------------------------
+BUMP_EXTRA_ARGS := $(if $(PREID),--preid "$(PREID)",) \
+                   $(if $(NOTE),--change-note "$(NOTE)",) \
+                   $(if $(filter 1 true yes,$(DRY_RUN)),--dry-run,) \
+                   $(if $(filter 1 true yes,$(NO_WORKSHOP)),--no-workshop,) \
+                   $(if $(filter 1 true yes,$(FORCE)),--force,)
+
+bump:
+	@if [ -z "$(BUMP)" ]; then \
+		echo "Error: BUMP is required. Example: make bump BUMP=patch MODS='run-history-plus run-resumer'" >&2; \
+		exit 1; \
+	fi; \
+	TARGETS="$(strip $(if $(MODS),$(MODS),$(MOD)))"; \
+	if [ -z "$$TARGETS" ]; then \
+		echo "Error: MODS or MOD is required (or use 'make bump-all BUMP=$(BUMP)')." >&2; \
+		exit 1; \
+	fi; \
+	python3 scripts/bump-version.py $(BUMP_EXTRA_ARGS) "$(BUMP)" $$TARGETS
+
+bump-all:
+	@if [ -z "$(BUMP)" ]; then \
+		echo "Error: BUMP is required. Example: make bump-all BUMP=patch" >&2; \
+		exit 1; \
+	fi; \
+	python3 scripts/bump-version.py $(BUMP_EXTRA_ARGS) "$(BUMP)" --all

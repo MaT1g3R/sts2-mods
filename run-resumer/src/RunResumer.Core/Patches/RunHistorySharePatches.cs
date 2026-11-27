@@ -108,9 +108,9 @@ internal static class RunHistoryShareUiHelper
             container.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
             container.GrowHorizontal = Control.GrowDirection.Begin;
             container.GrowVertical = Control.GrowDirection.Begin;
-            container.OffsetLeft = -220f;
+            container.OffsetLeft = -168f;
             container.OffsetTop = -260f;
-            container.OffsetRight = -48f;
+            container.OffsetRight = -20f;
             container.OffsetBottom = -48f;
             container.AddThemeConstantOverride("separation", 10);
             historyScreen.AddChild(container);
@@ -251,7 +251,7 @@ internal static class RunHistoryShareUiHelper
     {
         NButton button = buttonScene.Instantiate<NButton>(PackedScene.GenEditState.Disabled);
         button.Name = name;
-        button.CustomMinimumSize = new Vector2(172f, 64f);
+        button.CustomMinimumSize = new Vector2(148f, 64f);
 
         // NShareButton._Ready() runs on tree entry and overwrites %Label and disables the button.
         button.Connect(Node.SignalName.Ready, Callable.From(() =>
@@ -297,7 +297,7 @@ internal static class RunHistoryShareUiHelper
             shadow.Modulate = ButtonShadowColor;
         }
 
-        button.PivotOffset = new Vector2(86f, 32f);
+        button.PivotOffset = button.CustomMinimumSize * 0.5f;
         Tween? hoverTween = null;
         bool isFocused = false;
 

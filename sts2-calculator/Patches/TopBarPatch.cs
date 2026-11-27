@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Godot;
 using HarmonyLib;
@@ -13,10 +14,33 @@ namespace Sts2Calculator.Patches;
 internal static class TopBarPanelRegistry
 {
 	private static readonly ConditionalWeakTable<NTopBar, CalculatorPanel> _panels = new();
+	private static readonly List<WeakReference<NTopBar>> _tracked = new();
 
-	public static void Register(NTopBar topBar, CalculatorPanel panel) => _panels.AddOrUpdate(topBar, panel);
+	public static void Register(NTopBar topBar, CalculatorPanel panel)
+	{
+		if (!_panels.TryGetValue(topBar, out _))
+		{
+			_tracked.Add(new WeakReference<NTopBar>(topBar));
+		}
+		_panels.AddOrUpdate(topBar, panel);
+	}
 
 	public static bool TryGet(NTopBar topBar, out CalculatorPanel? panel) => _panels.TryGetValue(topBar, out panel);
+
+	public static List<NTopBar> TakeAllLive()
+	{
+		var live = new List<NTopBar>();
+		for (int i = _tracked.Count - 1; i >= 0; i--)
+		{
+			if (_tracked[i].TryGetTarget(out NTopBar? topBar) && GodotObject.IsInstanceValid(topBar))
+			{
+				live.Add(topBar);
+				_panels.Remove(topBar);
+			}
+		}
+		_tracked.Clear();
+		return live;
+	}
 }
 
 /// <summary>
@@ -28,10 +52,15 @@ public static class TopBarReadyPatch
 {
 	public static void Postfix(NTopBar __instance)
 	{
+		AttachToTopBar(__instance);
+	}
+
+	internal static void AttachToTopBar(NTopBar topBar)
+	{
 		try
 		{
-			var rightAlignedStuff = __instance.Map?.GetParent() as HBoxContainer
-				?? __instance.GetNodeOrNull<HBoxContainer>("RightAlignedStuff");
+			var rightAlignedStuff = topBar.Map?.GetParent() as HBoxContainer
+				?? topBar.GetNodeOrNull<HBoxContainer>("RightAlignedStuff");
 
 			if (rightAlignedStuff == null)
 			{
@@ -46,16 +75,16 @@ public static class TopBarReadyPatch
 
 			var calcButton = new CalculatorTopBarButton();
 			var calcPanel = new CalculatorPanel();
-			TopBarPanelRegistry.Register(__instance, calcPanel);
+			TopBarPanelRegistry.Register(topBar, calcPanel);
 
 			// Expand RightAlignedStuff's left offset by 80px so all right-aligned items (Timer, SaveIndicator, Calculator, Map, Deck, Pause) fit cleanly without overlapping
 			rightAlignedStuff.OffsetLeft -= 80f;
 
-			int mapIndex = __instance.Map != null ? __instance.Map.GetIndex() : rightAlignedStuff.GetChildCount();
+			int mapIndex = topBar.Map != null ? topBar.Map.GetIndex() : rightAlignedStuff.GetChildCount();
 			rightAlignedStuff.AddChildSafely(calcButton.Root);
 			rightAlignedStuff.MoveChild(calcButton.Root, mapIndex);
 
-			__instance.AddChildSafely(calcPanel.Root);
+			topBar.AddChildSafely(calcPanel.Root);
 
 			calcButton.Pressed += () => calcPanel.Toggle(calcButton.Root);
 			calcPanel.VisibilityChanged += calcButton.SetOpenState;
@@ -63,6 +92,30 @@ public static class TopBarReadyPatch
 		catch (Exception ex)
 		{
 			Log.Error($"[{Sts2CalculatorEntry.ModId}] Failed to inject Calculator button into NTopBar: {ex}");
+		}
+	}
+
+	internal static void DetachAll()
+	{
+		foreach (NTopBar topBar in TopBarPanelRegistry.TakeAllLive())
+		{
+			var rightAlignedStuff = topBar.Map?.GetParent() as HBoxContainer
+				?? topBar.GetNodeOrNull<HBoxContainer>("RightAlignedStuff");
+
+			Control? btn = rightAlignedStuff?.GetNodeOrNull<Control>(CalculatorTopBarButton.NodeName);
+			if (btn != null && GodotObject.IsInstanceValid(btn))
+			{
+				rightAlignedStuff!.RemoveChild(btn);
+				btn.QueueFree();
+				rightAlignedStuff.OffsetLeft += 80f;
+			}
+
+			Control? panel = topBar.GetNodeOrNull<Control>(CalculatorPanel.NodeName);
+			if (panel != null && GodotObject.IsInstanceValid(panel))
+			{
+				topBar.RemoveChild(panel);
+				panel.QueueFree();
+			}
 		}
 	}
 }

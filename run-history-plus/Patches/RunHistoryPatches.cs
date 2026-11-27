@@ -11,6 +11,7 @@ namespace RunHistoryPlus.Patches;
 internal static class RunHistoryFilterBarRegistry
 {
     private static readonly ConditionalWeakTable<NRunHistory, RunHistoryFilterBar> Bars = new();
+    private static readonly List<WeakReference<NRunHistory>> TrackedScreens = new();
 
     public static RunHistoryFilterBar GetOrCreate(NRunHistory screen)
     {
@@ -18,6 +19,7 @@ internal static class RunHistoryFilterBarRegistry
         {
             bar = new RunHistoryFilterBar(screen);
             Bars.Add(screen, bar);
+            TrackedScreens.Add(new WeakReference<NRunHistory>(screen));
         }
 
         return bar;
@@ -26,6 +28,22 @@ internal static class RunHistoryFilterBarRegistry
     public static bool TryGet(NRunHistory screen, out RunHistoryFilterBar? bar)
     {
         return Bars.TryGetValue(screen, out bar);
+    }
+
+    public static void DisposeAll()
+    {
+        for (int i = TrackedScreens.Count - 1; i >= 0; i--)
+        {
+            if (TrackedScreens[i].TryGetTarget(out NRunHistory? screen) &&
+                GodotObject.IsInstanceValid(screen) &&
+                Bars.TryGetValue(screen, out RunHistoryFilterBar? bar))
+            {
+                bar.Dispose();
+                Bars.Remove(screen);
+            }
+        }
+
+        TrackedScreens.Clear();
     }
 }
 

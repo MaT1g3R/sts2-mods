@@ -18,9 +18,12 @@ internal static class MapPointHistoryEntryReadyPatch
     private sealed class RightClickState
     {
         public bool PressedInside;
+        public Callable PressedCallable;
+        public Callable ReleasedCallable;
     }
 
     private static readonly ConditionalWeakTable<NMapPointHistoryEntry, RightClickState> States = new();
+    private static readonly List<WeakReference<NMapPointHistoryEntry>> TrackedEntries = new();
 
     private static readonly AccessTools.FieldRef<NMapPointHistoryEntry, RunHistory> RunHistoryRef =
         AccessTools.FieldRefAccess<NMapPointHistoryEntry, RunHistory>("_runHistory");
@@ -31,44 +34,77 @@ internal static class MapPointHistoryEntryReadyPatch
 
     public static void Postfix(NMapPointHistoryEntry __instance)
     {
-        RightClickState state = States.GetOrCreateValue(__instance);
+        AttachEntry(__instance);
+    }
 
-        __instance.Connect(
-            NClickableControl.SignalName.MousePressed,
-            Callable.From<InputEvent>(ev =>
+    internal static void AttachEntry(NMapPointHistoryEntry entry)
+    {
+        if (States.TryGetValue(entry, out _))
+        {
+            return;
+        }
+
+        RightClickState state = new RightClickState();
+        state.PressedCallable = Callable.From<InputEvent>(ev =>
+        {
+            if (ev is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Right)
             {
-                if (ev is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Right)
-                {
-                    state.PressedInside = __instance.IsEnabled && __instance.IsVisibleInTree() && IsFocusedGetter(__instance);
-                }
-            }));
-
-        __instance.Connect(
-            NClickableControl.SignalName.MouseReleased,
-            Callable.From<InputEvent>(ev =>
+                state.PressedInside = entry.IsEnabled && entry.IsVisibleInTree() && IsFocusedGetter(entry);
+            }
+        });
+        state.ReleasedCallable = Callable.From<InputEvent>(ev =>
+        {
+            if (ev is not InputEventMouseButton mb || mb.ButtonIndex != MouseButton.Right)
             {
-                if (ev is not InputEventMouseButton mb || mb.ButtonIndex != MouseButton.Right)
-                {
-                    return;
-                }
+                return;
+            }
 
-                bool shouldLaunch = state.PressedInside && __instance.IsEnabled && __instance.IsVisibleInTree() && IsFocusedGetter(__instance);
-                state.PressedInside = false;
-                if (!shouldLaunch)
-                {
-                    return;
-                }
+            bool shouldLaunch = state.PressedInside && entry.IsEnabled && entry.IsVisibleInTree() && IsFocusedGetter(entry);
+            state.PressedInside = false;
+            if (!shouldLaunch)
+            {
+                return;
+            }
 
-                try
+            try
+            {
+                RunHistory history = RunHistoryRef(entry);
+                ReplaySession.TryLaunchFromHistory(history, entry.FloorNum);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[RunResumer] Error handling right-click on floor {entry.FloorNum}: {ex}");
+            }
+        });
+
+        States.Add(entry, state);
+        TrackedEntries.Add(new WeakReference<NMapPointHistoryEntry>(entry));
+
+        entry.Connect(NClickableControl.SignalName.MousePressed, state.PressedCallable);
+        entry.Connect(NClickableControl.SignalName.MouseReleased, state.ReleasedCallable);
+    }
+
+    internal static void DetachAll()
+    {
+        for (int i = TrackedEntries.Count - 1; i >= 0; i--)
+        {
+            if (TrackedEntries[i].TryGetTarget(out NMapPointHistoryEntry? entry) &&
+                GodotObject.IsInstanceValid(entry) &&
+                States.TryGetValue(entry, out RightClickState? state))
+            {
+                if (entry.IsConnected(NClickableControl.SignalName.MousePressed, state.PressedCallable))
                 {
-                    RunHistory history = RunHistoryRef(__instance);
-                    ReplaySession.TryLaunchFromHistory(history, __instance.FloorNum);
+                    entry.Disconnect(NClickableControl.SignalName.MousePressed, state.PressedCallable);
                 }
-                catch (Exception ex)
+                if (entry.IsConnected(NClickableControl.SignalName.MouseReleased, state.ReleasedCallable))
                 {
-                    Log.Error($"[RunResumer] Error handling right-click on floor {__instance.FloorNum}: {ex}");
+                    entry.Disconnect(NClickableControl.SignalName.MouseReleased, state.ReleasedCallable);
                 }
-            }));
+                States.Remove(entry);
+            }
+        }
+
+        TrackedEntries.Clear();
     }
 }
 

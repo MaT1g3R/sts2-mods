@@ -49,6 +49,7 @@ internal static class RunHistoryShareUiHelper
 
     private sealed class ShareUiState
     {
+        public required Control Container;
         public required NButton DeleteButton;
         public required Control DeleteLabelContainer;
         public required NButton ExportButton;
@@ -59,6 +60,7 @@ internal static class RunHistoryShareUiHelper
     }
 
     private static readonly ConditionalWeakTable<NRunHistory, ShareUiState> UiStates = new();
+    private static readonly List<WeakReference<NRunHistory>> TrackedScreens = new();
 
     private static readonly AccessTools.FieldRef<NRunHistory, RunHistory> HistoryRef =
         AccessTools.FieldRefAccess<NRunHistory, RunHistory>("_history");
@@ -135,6 +137,7 @@ internal static class RunHistoryShareUiHelper
 
             ShareUiState state = new ShareUiState
             {
+                Container = container,
                 DeleteButton = deleteBtn,
                 DeleteLabelContainer = deleteLabelContainer,
                 ExportButton = exportBtn,
@@ -144,6 +147,7 @@ internal static class RunHistoryShareUiHelper
                 ExportTipDescription = "No Run Resumer snapshots saved for this run."
             };
             UiStates.Add(historyScreen, state);
+            TrackedScreens.Add(new WeakReference<NRunHistory>(historyScreen));
 
             SetButtonEnabled(deleteBtn, deleteLabelContainer, enabled: false);
             SetButtonEnabled(exportBtn, exportLabelContainer, enabled: false);
@@ -219,6 +223,40 @@ internal static class RunHistoryShareUiHelper
 
         SetButtonEnabled(state.ExportButton, state.ExportLabelContainer, enabled: true);
         state.ExportTipDescription = "Export this run's history and Run Resumer snapshots as a [gold].zip[/gold] archive.";
+    }
+
+    public static void ReattachToScreen(NRunHistory historyScreen)
+    {
+        AttachButtons(historyScreen);
+        UpdateRunState(historyScreen, HistoryRef(historyScreen));
+    }
+
+    public static void DetachAll()
+    {
+        for (int i = TrackedScreens.Count - 1; i >= 0; i--)
+        {
+            if (TrackedScreens[i].TryGetTarget(out NRunHistory? screen) &&
+                GodotObject.IsInstanceValid(screen))
+            {
+                if (UiStates.TryGetValue(screen, out ShareUiState? state))
+                {
+                    if (GodotObject.IsInstanceValid(state.Container))
+                    {
+                        state.Container.GetParent()?.RemoveChild(state.Container);
+                        state.Container.QueueFree();
+                    }
+                    UiStates.Remove(screen);
+                }
+
+                Control? existingShareBtn = screen.GetNodeOrNull<Control>("%ShareButton");
+                if (existingShareBtn != null && GodotObject.IsInstanceValid(existingShareBtn))
+                {
+                    existingShareBtn.Visible = true;
+                }
+            }
+        }
+
+        TrackedScreens.Clear();
     }
 
     public static void ImportDroppedFile(string filePath)

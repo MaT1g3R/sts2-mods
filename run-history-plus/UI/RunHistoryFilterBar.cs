@@ -81,6 +81,11 @@ internal sealed class RunHistoryFilterBar
     private NativeDropdown? _outcomeDropdown;
     private NativeDropdown? _characterDropdown;
     private NativeDropdown? _gameTypeDropdown;
+    private MarginContainer? _contentMargin;
+    private bool _hadContentMarginTopOverride;
+    private int _originalContentMarginTop;
+    private Control? _leftFilters;
+    private Control? _rightSort;
     private Control? _runSelectorHolder;
     private NativeDropdown? _runSelectorDropdown;
     private NativeDropdown? _sortFieldDropdown;
@@ -114,10 +119,15 @@ internal sealed class RunHistoryFilterBar
         _boldFont = boldFont;
 
         // Nudge main content slightly down so the centered Run Selector dropdown has clean headroom
-        MarginContainer? contentMargin = _screen.GetNodeOrNull<MarginContainer>("ScreenContents/Content");
-        if (contentMargin != null)
+        _contentMargin = _screen.GetNodeOrNull<MarginContainer>("ScreenContents/Content");
+        if (_contentMargin != null)
         {
-            contentMargin.AddThemeConstantOverride("margin_top", 78);
+            _hadContentMarginTopOverride = _contentMargin.HasThemeConstantOverride("margin_top");
+            if (_hadContentMarginTopOverride)
+            {
+                _originalContentMarginTop = _contentMargin.GetThemeConstant("margin_top");
+            }
+            _contentMargin.AddThemeConstantOverride("margin_top", 78);
         }
 
         // --- Top-left: Outcome, Character, Game Type dropdowns + match count ---
@@ -130,6 +140,7 @@ internal sealed class RunHistoryFilterBar
             Name = "RunHistoryPlusLeftFilters",
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
+        _leftFilters = leftFilters;
         leftFilters.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
         leftFilters.OffsetLeft = 20f;
         leftFilters.OffsetTop = 60f;
@@ -227,6 +238,7 @@ internal sealed class RunHistoryFilterBar
             Name = "RunHistoryPlusRightSort",
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
+        _rightSort = rightSort;
         rightSort.SetAnchorsPreset(Control.LayoutPreset.TopRight);
         rightSort.GrowHorizontal = Control.GrowDirection.Begin;
         rightSort.OffsetLeft = -16f - rightSortWidth;
@@ -434,6 +446,72 @@ internal sealed class RunHistoryFilterBar
         CloseAllDropdowns();
         _moreFiltersPanel?.Hide();
         _seedCopyController?.OnSubmenuHidden();
+    }
+
+    public void ReattachToLiveScreen()
+    {
+        if (!GodotObject.IsInstanceValid(_screen) || !_screen.IsVisibleInTree())
+        {
+            return;
+        }
+
+        PopulateCharacterDropdown();
+        UpdatePlayerCountUi();
+        UpdateMoreFiltersButtonLabel();
+        _moreFiltersPanel?.RefreshState();
+
+        List<string>? runNames = RunNamesRef(_screen);
+        int count = runNames?.Count ?? 0;
+        if (_matchCountLabel != null)
+        {
+            _matchCountLabel.Text = count == 1 ? "1 run" : $"{count} runs";
+        }
+        UpdateMoreFiltersMatchSummary();
+
+        int currentIndex = IndexRef(_screen);
+        if (count > 0 && currentIndex >= 0 && currentIndex < count)
+        {
+            SyncSelectedRunLabel(currentIndex);
+        }
+    }
+
+    public void Dispose()
+    {
+        _loadGeneration++;
+        _isIndexing = false;
+        _pendingApplyAfterIndex = false;
+        _pendingRefreshRunSelectorAfterIndex = false;
+        CloseAllDropdowns();
+        _moreFiltersPanel?.Hide();
+        _seedCopyController?.Dispose();
+
+        FreeControl(_leftFilters);
+        FreeControl(_runSelectorHolder);
+        FreeControl(_rightSort);
+        FreeControl(_moreFiltersButton);
+        FreeControl(_emptyStateOverlay);
+        FreeControl(_moreFiltersPanel?.Root);
+
+        if (_contentMargin != null && GodotObject.IsInstanceValid(_contentMargin))
+        {
+            if (_hadContentMarginTopOverride)
+            {
+                _contentMargin.AddThemeConstantOverride("margin_top", _originalContentMarginTop);
+            }
+            else
+            {
+                _contentMargin.RemoveThemeConstantOverride("margin_top");
+            }
+        }
+    }
+
+    private static void FreeControl(Control? control)
+    {
+        if (control != null && GodotObject.IsInstanceValid(control))
+        {
+            control.GetParent()?.RemoveChild(control);
+            control.QueueFree();
+        }
     }
 
     private void PopulateStaticDropdowns()

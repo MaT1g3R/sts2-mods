@@ -12,9 +12,14 @@ namespace NoSentry;
 [ModInitializer("Initialize")]
 public static class NoSentryEntry
 {
+    private const string HarmonyId = "com.vmservice.nosentry";
+    private static Harmony? _harmony;
+
     public static void Initialize()
     {
-        new Harmony("com.vmservice.nosentry").PatchAll();
+        _harmony?.UnpatchAll(HarmonyId);
+        _harmony = new Harmony(HarmonyId);
+        _harmony.PatchAll(typeof(NoSentryEntry).Assembly);
 
         // SentryBootstrap._EnterTree runs before ModManager.Initialize; close both layers now.
         SentryService.Shutdown();
@@ -24,5 +29,12 @@ public static class NoSentryEntry
         }
 
         Log.Info("[NoSentry] Sentry reporting disabled");
+    }
+
+    public static void Shutdown()
+    {
+        _harmony?.UnpatchAll(HarmonyId);
+        _harmony = null;
+        Log.Info("[NoSentry] Shut down cleanly");
     }
 }

@@ -306,6 +306,37 @@ internal sealed class SeedCopyController
         _tooltipPanel.Visible = true;
     }
 
+    public void Dispose()
+    {
+        _copiedGeneration++;
+        _isHovered = false;
+
+        if (_seedLabel != null && GodotObject.IsInstanceValid(_seedLabel))
+        {
+            _seedLabel.Resized -= UpdateHitboxBounds;
+            _seedLabel.Modulate = Colors.White;
+        }
+        if (_seedParent != null && GodotObject.IsInstanceValid(_seedParent))
+        {
+            _seedParent.Resized -= UpdateHitboxBounds;
+        }
+        if (_hitboxHost != null && _hitboxHost != _seedLabel && GodotObject.IsInstanceValid(_hitboxHost))
+        {
+            _hitboxHost.Resized -= UpdateHitboxBounds;
+        }
+
+        if (_hitbox != null && GodotObject.IsInstanceValid(_hitbox))
+        {
+            _hitbox.GetParent()?.RemoveChild(_hitbox);
+            _hitbox.QueueFree();
+        }
+        if (GodotObject.IsInstanceValid(_tooltipPanel))
+        {
+            _tooltipPanel.GetParent()?.RemoveChild(_tooltipPanel);
+            _tooltipPanel.QueueFree();
+        }
+    }
+
     private bool HasCopyableSeed() => !string.IsNullOrWhiteSpace(_getCurrentSeed());
 
     private static StyleBoxFlat CreateTooltipStyle(Color borderColor) => new()

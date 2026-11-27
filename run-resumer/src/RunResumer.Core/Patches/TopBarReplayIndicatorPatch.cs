@@ -64,6 +64,16 @@ internal static class TopBarReplayIndicatorHelper
         }
     }
 
+    public static void DetachFrom(NTopBar topBar)
+    {
+        Control? existing = topBar.LeftContainer?.GetNodeOrNull<Control>(IndicatorNodeName);
+        if (existing != null && GodotObject.IsInstanceValid(existing))
+        {
+            topBar.LeftContainer!.RemoveChild(existing);
+            existing.QueueFree();
+        }
+    }
+
     private static void PositionAfterPotions(NTopBar topBar, Control indicator)
     {
         Control? potionSlotGroup = topBar.PotionContainer?.GetParent() as Control;

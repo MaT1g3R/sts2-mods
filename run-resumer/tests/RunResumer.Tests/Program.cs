@@ -34,6 +34,7 @@ internal static class Program
         TestHarmonyPatchTargetsResolve();
         TestRoundTripAndCompression();
         TestShareExportImportAndValidation();
+        TestStorageStatsAndPruneOldest();
         Console.WriteLine("ALL TESTS PASSED");
         return 0;
     }
@@ -121,13 +122,16 @@ internal static class Program
             checkedPatches++;
         }
 
-        Assert(checkedPatches == 19, $"Expected 19 patch classes, checked {checkedPatches}");
+        Assert(checkedPatches == 21, $"Expected 21 patch classes, checked {checkedPatches}");
         Assert(AccessTools.Field(typeof(SaveManager), "_saveStore") != null, "SaveManager._saveStore missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_history") != null, "NRunHistory._history missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_runNames") != null, "NRunHistory._runNames missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen.NRunHistory), "_index") != null, "NRunHistory._index missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NSubmenu), "_stack") != null, "NSubmenu._stack missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.NRunSubmenuStack), "_runHistoryScreenScene") != null, "NRunSubmenuStack._runHistoryScreenScene missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.ModdingScreen.NModdingScreen), "_modInfoContainer") != null, "NModdingScreen._modInfoContainer missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.ModdingScreen.NModdingScreen), "_modRowContainer") != null, "NModdingScreen._modRowContainer missing");
+        Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.ModdingScreen.NModMenuRow), "_isSelected") != null, "NModMenuRow._isSelected missing");
         Assert(AccessTools.Field(typeof(MegaCrit.Sts2.Core.Nodes.Screens.NRunSubmenuStack), "_runHistoryScreen") != null, "NRunSubmenuStack._runHistoryScreen missing");
         Console.WriteLine($"[PASS] Verified all {checkedPatches} Harmony patch targets resolve against sts2.dll");
     }
@@ -664,6 +668,50 @@ internal static class Program
                     .ToList()
             }
         };
+    }
+
+    private static void TestStorageStatsAndPruneOldest()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"run_resumer_storage_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            File.WriteAllBytes(Path.Combine(tempDir, "1000.rrpb"), new byte[500]);
+            File.WriteAllBytes(Path.Combine(tempDir, "2000.rrpb"), new byte[1200]);
+            File.WriteAllBytes(Path.Combine(tempDir, "3000.rrpb"), new byte[800]);
+            File.WriteAllBytes(Path.Combine(tempDir, "4000.rrpb"), new byte[1500]);
+            File.WriteAllBytes(Path.Combine(tempDir, "ignore.txt"), new byte[999]);
+
+            (int count, long bytes) = RunArchiveStorage.MeasureArchiveDirectory(tempDir);
+            Assert(count == 4, $"Expected 4 .rrpb files, got {count}");
+            Assert(bytes == 4000, $"Expected 4000 bytes, got {bytes}");
+
+            // Delete oldest 2 while protecting 2000 -> should delete 1000 and 3000
+            (int deleted, long freed, List<long> deletedStarts) =
+                RunArchiveStorage.DeleteOldestArchivesInDirectory(tempDir, 2, protectedStartTime: 2000);
+            Assert(deleted == 2, $"Expected 2 deleted files, got {deleted}");
+            Assert(freed == 1300, $"Expected 1300 freed bytes, got {freed}");
+            Assert(deletedStarts.SequenceEqual(new long[] { 1000, 3000 }), "Expected 1000 and 3000 to be deleted in oldest-first order");
+            Assert(!File.Exists(Path.Combine(tempDir, "1000.rrpb")), "1000.rrpb should be deleted");
+            Assert(File.Exists(Path.Combine(tempDir, "2000.rrpb")), "Protected 2000.rrpb should remain");
+            Assert(!File.Exists(Path.Combine(tempDir, "3000.rrpb")), "3000.rrpb should be deleted");
+            Assert(File.Exists(Path.Combine(tempDir, "4000.rrpb")), "4000.rrpb should remain");
+            Assert(File.Exists(Path.Combine(tempDir, "ignore.txt")), "Non-.rrpb file must remain untouched");
+
+            Assert(RunArchiveStorage.FormatBytes(0) == "0 B", "FormatBytes(0) mismatch");
+            Assert(RunArchiveStorage.FormatBytes(512) == "512 B", "FormatBytes(512) mismatch");
+            Assert(RunArchiveStorage.FormatBytes(1536) == "1.5 KB", "FormatBytes(1536) mismatch");
+            Assert(RunArchiveStorage.FormatBytes(2 * 1024 * 1024) == "2 MB", "FormatBytes(2MB) mismatch");
+
+            Console.WriteLine("[PASS] Verified per-profile storage measurement, oldest-X pruning, active-run protection, and byte formatting");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
     }
 
     private static void Assert(bool condition, string message)

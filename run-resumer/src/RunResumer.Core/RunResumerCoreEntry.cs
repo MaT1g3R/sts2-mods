@@ -5,6 +5,7 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Nodes.Screens.ModdingScreen;
 using MegaCrit.Sts2.Core.Nodes.Screens.RunHistoryScreen;
 using RunResumer.Patches;
 
@@ -42,6 +43,7 @@ public static class RunResumerCoreEntry
         {
             RunHistoryShareUiHelper.DetachAll();
             MapPointHistoryEntryReadyPatch.DetachAll();
+            ModSettingsStorageHelper.DetachAll();
             DetachTopBarIndicators();
         }
         catch (Exception ex)
@@ -73,6 +75,9 @@ public static class RunResumerCoreEntry
                     break;
                 case NTopBar topBar:
                     TopBarReplayIndicatorHelper.SyncIndicator(topBar);
+                    break;
+                case NModdingScreen moddingScreen:
+                    ModSettingsStorageHelper.ReattachToLiveModdingScreen(moddingScreen);
                     break;
             }
         }

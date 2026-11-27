@@ -20,12 +20,19 @@ MODS := $(sort $(patsubst %/,%,$(dir $(wildcard */*.csproj))))
 
 BUILD_TARGETS         := $(addprefix build-,$(MODS))
 DEPLOY_TARGETS        := $(addprefix deploy-,$(MODS))
+HOT_DEPLOY_TARGETS    := $(addprefix hot-deploy-,$(MODS))
+HOT_WATCH_TARGETS     := $(addprefix hot-watch-,$(MODS))
+HOT_DISABLE_TARGETS   := $(addprefix hot-disable-,$(MODS))
 STEAM_PREPARE_TARGETS := $(addprefix steam-prepare-,$(MODS))
 STEAM_UPLOAD_TARGETS  := $(addprefix steam-upload-,$(MODS))
 
 .PHONY: help list versions \
         build build-all $(BUILD_TARGETS) \
         deploy deploy-all $(DEPLOY_TARGETS) \
+        hot-install \
+        hot-deploy hot-deploy-all $(HOT_DEPLOY_TARGETS) \
+        hot-watch $(HOT_WATCH_TARGETS) \
+        hot-disable hot-disable-all $(HOT_DISABLE_TARGETS) \
         steam-prepare $(STEAM_PREPARE_TARGETS) \
         steam-upload $(STEAM_UPLOAD_TARGETS) \
         bump bump-all
@@ -55,12 +62,21 @@ help:
 	@echo "Targets (use either <target>-<mod> or <target> MOD=<mod>):"
 	@echo "  build-<mod>           Build and test a mod without deploying"
 	@echo "  deploy-<mod>          Build, test, and deploy a mod to the local STS2 mods directory"
+	@echo "  hot-deploy-<mod>      Build and hot-reload a mod in a running game (via Sts2HotReloader)"
+	@echo "  hot-watch-<mod>       Watch a mod's sources and hot-reload automatically on save"
+	@echo "  hot-disable-<mod>     Remove a mod from Sts2HotReloader/dev-mods/"
 	@echo "  steam-prepare-<mod>   Prepare/stage a Steam Workshop release for a mod"
 	@echo "  steam-upload-<mod>    Prepare and upload a mod to Steam Workshop"
 	@echo ""
 	@echo "Generic & aggregate targets:"
 	@echo "  build MOD=<mod>           Same as build-<mod>"
 	@echo "  deploy MOD=<mod>          Same as deploy-<mod>"
+	@echo "  hot-install               Build and install the Sts2HotReloader dev host mod"
+	@echo "  hot-deploy MOD=<mod>      Same as hot-deploy-<mod>"
+	@echo "  hot-deploy-all            Hot-deploy all detected mods to dev-mods/"
+	@echo "  hot-watch MOD=<mod>       Same as hot-watch-<mod>"
+	@echo "  hot-disable MOD=<mod>     Same as hot-disable-<mod>"
+	@echo "  hot-disable-all           Remove all mods from dev-mods/"
 	@echo "  steam-prepare MOD=<mod>   Same as steam-prepare-<mod>"
 	@echo "  steam-upload MOD=<mod>    Same as steam-upload-<mod>"
 	@echo "  build-all                 Build and test all detected mods without deploying"
@@ -149,7 +165,40 @@ $(DEPLOY_TARGETS): deploy-%: build-%
 		fi; \
 	done; \
 	echo "==> Deploying $$MOD_DIR ($$MOD_CSPROJ, $(CONFIGURATION))..."; \
+	sh scripts/hot-deploy.sh "$$MOD_DIR" "$(CONFIGURATION)" --disable >/dev/null 2>&1 || true; \
 	dotnet build "$$MOD_CSPROJ" -c "$(CONFIGURATION)" -p:DeployToMods=true --no-restore $(DOTNET_GAME_DIR_ARG)
+
+# ------------------------------------------------------------------------------
+# 2b. Live hot-reload workflow (via tools/sts2-hot-reloader)
+# ------------------------------------------------------------------------------
+hot-install:
+	@echo "==> Building and installing Sts2HotReloader ($(CONFIGURATION))..."
+	@dotnet build tools/sts2-hot-reloader/Sts2HotReloader.csproj -c "$(CONFIGURATION)" -p:DeployToMods=true $(DOTNET_GAME_DIR_ARG)
+
+hot-deploy:
+	$(REQUIRE_MOD)
+	@$(MAKE) --no-print-directory hot-deploy-$(MOD)
+
+hot-deploy-all: $(HOT_DEPLOY_TARGETS)
+
+$(HOT_DEPLOY_TARGETS): hot-deploy-%:
+	@sh scripts/hot-deploy.sh "$*" "$(CONFIGURATION)"
+
+hot-watch:
+	$(REQUIRE_MOD)
+	@$(MAKE) --no-print-directory hot-watch-$(MOD)
+
+$(HOT_WATCH_TARGETS): hot-watch-%:
+	@sh scripts/hot-watch.sh "$*" "$(CONFIGURATION)"
+
+hot-disable:
+	$(REQUIRE_MOD)
+	@$(MAKE) --no-print-directory hot-disable-$(MOD)
+
+hot-disable-all: $(HOT_DISABLE_TARGETS)
+
+$(HOT_DISABLE_TARGETS): hot-disable-%:
+	@sh scripts/hot-deploy.sh "$*" "$(CONFIGURATION)" --disable
 
 # ------------------------------------------------------------------------------
 # 3. Prepare a Steam Workshop release for a mod

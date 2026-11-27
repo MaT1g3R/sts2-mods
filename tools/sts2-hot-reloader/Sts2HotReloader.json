@@ -1,0 +1,11 @@
+{
+  "id": "Sts2HotReloader",
+  "name": "STS2 Hot Reloader (Dev)",
+  "author": "vmService",
+  "description": "Developer-only hot reload host that loads mods from dev-mods/ in collectible AssemblyLoadContexts.",
+  "version": "1.0.0",
+  "has_pck": false,
+  "has_dll": true,
+  "dependencies": [],
+  "affects_gameplay": false
+}

@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>Sts2HotReloader</AssemblyName>
+    <RootNamespace>Sts2HotReloader</RootNamespace>
+    <Version>1.0.0</Version>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);MSB3270</NoWarn>
+
+    <!-- Override with -p:Sts2GameDir=... or STS2_GAME_DIR env variable -->
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == ''">$(STS2_GAME_DIR)</Sts2GameDir>
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == '' and Exists('$(HOME)/.steam/steam/steamapps/common/Slay the Spire 2')">$(HOME)/.steam/steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == '' and Exists('$(HOME)/.local/share/Steam/steamapps/common/Slay the Spire 2')">$(HOME)/.local/share/Steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == '' and Exists('$(HOME)/Library/Application Support/Steam/steamapps/common/Slay the Spire 2')">$(HOME)/Library/Application Support/Steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+    <Sts2GameDir Condition="'$(Sts2GameDir)' == '' and Exists('C:/Program Files (x86)/Steam/steamapps/common/Slay the Spire 2')">C:/Program Files (x86)/Steam/steamapps/common/Slay the Spire 2</Sts2GameDir>
+
+    <Sts2DataDir>$(Sts2GameDir)/data_sts2_linuxbsd_x86_64</Sts2DataDir>
+    <Sts2DataDir Condition="!Exists('$(Sts2DataDir)') and Exists('$(Sts2GameDir)/data_sts2_windows_x86_64')">$(Sts2GameDir)/data_sts2_windows_x86_64</Sts2DataDir>
+    <Sts2DataDir Condition="!Exists('$(Sts2DataDir)') and Exists('$(Sts2GameDir)/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_arm64')">$(Sts2GameDir)/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_arm64</Sts2DataDir>
+    <Sts2DataDir Condition="!Exists('$(Sts2DataDir)') and Exists('$(Sts2GameDir)/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_x86_64')">$(Sts2GameDir)/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_x86_64</Sts2DataDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="sts2">
+      <HintPath>$(Sts2DataDir)/sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2DataDir)/GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(Sts2DataDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="DeployToMods" AfterTargets="Build" Condition="'$(DeployToMods)' == 'true'">
+    <PropertyGroup>
+      <ModDestDir>$(Sts2GameDir)/mods/$(AssemblyName)</ModDestDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(ModDestDir);$(ModDestDir)/dev-mods" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDestDir)" />
+    <Copy SourceFiles="$(ProjectDir)$(AssemblyName).json" DestinationFolder="$(ModDestDir)" />
+    <Message Importance="High" Text="Deployed $(AssemblyName) to $(ModDestDir)" />
+  </Target>
+</Project>

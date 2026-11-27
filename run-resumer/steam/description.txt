@@ -4,6 +4,7 @@ Features:
 [list]
 [*] [b]Right-click any floor in Run History to replay[/b]. Jump straight back to the start of any floor.
 [*] [b]Export and import runs to share with friends[/b]. Save a run as a .zip file from Run History and send it to friends, or load theirs with the Import button or by dragging the .zip file onto the game window.
+[*] [b]Disk space management in Mod Settings[/b]: view how much disk space Run Resumer uses per profile and delete the oldest X snapshot files without removing your Run History entries.
 [*] [b]Much smaller file sizes[/b]: takes up far less disk space than the Slay the Spire 1 Run Resumer.
 [/list]
 

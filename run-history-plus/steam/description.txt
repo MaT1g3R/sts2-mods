@@ -2,7 +2,7 @@ Enhanced filtering, sorting, and navigation for the Slay the Spire 2 Run History
 
 Features:
 [list]
-[*] [b]Filter runs[/b] by Outcome (Wins and Losses, Wins, Losses), Character, and Game Type (Standard, Daily, Blitz, Dread, Custom)
+[*] [b]Filter runs[/b] by Outcome (Wins and Losses, Wins, Losses), Character, Game Type (Standard, Daily, Blitz, Dread, Custom), and Number of Players (1–4+ double-ended range slider, where 4+ includes runs with 4 or more players)
 [*] [b]Sort runs[/b] by Date, Badge Count, Run Time, Relic Count, or Card Count in Descending or Ascending order
 [*] [b]Quick Run Selector[/b] dropdown at the top of Run History showing date/time, character, ascension/game mode, and colour-coded Win/Loss so you can jump directly to any run
 [*] [b]More Filters menu with Relic Filter[/b]: browse discovered relics grouped by rarity, search by name, select one or more relics with Match All / Match Any, view and remove active filters, or clear all additional filters at once

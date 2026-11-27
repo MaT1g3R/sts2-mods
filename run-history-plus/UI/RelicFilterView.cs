@@ -123,8 +123,8 @@ internal sealed class RelicFilterView : IAdvancedFilterView
         _clearSearchBtn.Visible = false;
         toolbar.AddChild(_clearSearchBtn);
 
-        _matchAllBtn = MoreFiltersPanel.CreateStyledButton("Match All", _boldFont, () => SetMatchMode(MultiMatchMode.All), new Vector2(114f, 40f));
-        _matchAnyBtn = MoreFiltersPanel.CreateStyledButton("Match Any", _boldFont, () => SetMatchMode(MultiMatchMode.Any), new Vector2(114f, 40f));
+        _matchAllBtn = MoreFiltersPanel.CreateStyledButton("Match All", _boldFont, () => SetMatchMode(MultiMatchMode.All), new Vector2(124f, 40f));
+        _matchAnyBtn = MoreFiltersPanel.CreateStyledButton("Match Any", _boldFont, () => SetMatchMode(MultiMatchMode.Any), new Vector2(124f, 40f));
         toolbar.AddChild(_matchAllBtn);
         toolbar.AddChild(_matchAnyBtn);
 
@@ -512,30 +512,35 @@ internal sealed class RelicFilterView : IAdvancedFilterView
 
     private static void ApplyToggleStyle(Button btn, bool active)
     {
-        Color bg = active ? new Color("355768") : new Color("1E303A");
+        Color normalBg = active ? new Color("355768") : new Color("1E303A");
+        Color hoverBg = active ? new Color("426B80") : new Color("2C434F");
+        Color pressBg = active ? new Color("294452") : new Color("16242C");
         Color border = active ? GoldColor : new Color("3C5B6B");
+        int borderWidth = active ? 2 : 1;
 
-        StyleBoxFlat style = new StyleBoxFlat
-        {
-            BgColor = bg,
-            BorderColor = border,
-            BorderWidthLeft = active ? 2 : 1,
-            BorderWidthTop = active ? 2 : 1,
-            BorderWidthRight = active ? 2 : 1,
-            BorderWidthBottom = active ? 2 : 1,
-            CornerRadiusTopLeft = 4,
-            CornerRadiusTopRight = 4,
-            CornerRadiusBottomLeft = 4,
-            CornerRadiusBottomRight = 4,
-            ContentMarginLeft = 10,
-            ContentMarginTop = 6,
-            ContentMarginRight = 10,
-            ContentMarginBottom = 6
-        };
-
-        btn.AddThemeStyleboxOverride("normal", style);
+        btn.AddThemeStyleboxOverride("normal", CreateToggleStyleBox(normalBg, border, borderWidth));
+        btn.AddThemeStyleboxOverride("hover", CreateToggleStyleBox(hoverBg, border, borderWidth));
+        btn.AddThemeStyleboxOverride("pressed", CreateToggleStyleBox(pressBg, border, borderWidth));
         btn.AddThemeColorOverride("font_color", active ? GoldColor : CreamColor);
     }
+
+    private static StyleBoxFlat CreateToggleStyleBox(Color bg, Color border, int borderWidth) => new()
+    {
+        BgColor = bg,
+        BorderColor = border,
+        BorderWidthLeft = borderWidth,
+        BorderWidthTop = borderWidth,
+        BorderWidthRight = borderWidth,
+        BorderWidthBottom = borderWidth,
+        CornerRadiusTopLeft = 4,
+        CornerRadiusTopRight = 4,
+        CornerRadiusBottomLeft = 4,
+        CornerRadiusBottomRight = 4,
+        ContentMarginLeft = 10,
+        ContentMarginTop = 6,
+        ContentMarginRight = 10,
+        ContentMarginBottom = 6
+    };
 
     private static StyleBoxFlat CreateInputStyle(Color borderColor) => new()
     {

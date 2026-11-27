@@ -88,6 +88,8 @@ internal sealed class RunHistoryFilterBar
     private Font? _boldFont;
 
     private Label? _matchCountLabel;
+    private Label? _playerCountValueLabel;
+    private DoubleEndedPlayerSlider? _playerCountSlider;
     private Button? _moreFiltersButton;
     private Control? _emptyStateOverlay;
     private MoreFiltersPanel? _moreFiltersPanel;
@@ -132,7 +134,7 @@ internal sealed class RunHistoryFilterBar
         leftFilters.OffsetLeft = 20f;
         leftFilters.OffsetTop = 60f;
         leftFilters.OffsetRight = 240f;
-        leftFilters.OffsetBottom = 282f;
+        leftFilters.OffsetBottom = 356f;
         _screen.AddChild(leftFilters);
 
         Label filterLabel = CreateSectionLabel("Filter", boldFont);
@@ -159,6 +161,29 @@ internal sealed class RunHistoryFilterBar
             leftFilters.AddChild(_gameTypeDropdown.Root);
         }
 
+        Label playersLabel = CreateSectionLabel("Players", boldFont);
+        PlaceChild(playersLabel, 0f, 174f, 96f, 24f);
+        leftFilters.AddChild(playersLabel);
+
+        _playerCountValueLabel = new Label
+        {
+            Name = "PlayerCountValueLabel",
+            Text = RunFilterEngine.FormatPlayerCountRange(_state.MinPlayerCount, _state.MaxPlayerCount),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        if (regularFont != null) _playerCountValueLabel.AddThemeFontOverride("font", regularFont);
+        _playerCountValueLabel.AddThemeFontSizeOverride("font_size", 17);
+        _playerCountValueLabel.AddThemeColorOverride("font_color", MutedColor);
+        _playerCountValueLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.5f));
+        _playerCountValueLabel.AddThemeConstantOverride("shadow_offset_x", 2);
+        _playerCountValueLabel.AddThemeConstantOverride("shadow_offset_y", 1);
+        PlaceChild(_playerCountValueLabel, 96f, 174f, 124f, 24f);
+        leftFilters.AddChild(_playerCountValueLabel);
+
+        _playerCountSlider = new DoubleEndedPlayerSlider(boldFont, OnPlayerCountPreview, OnPlayerCountCommitted);
+        PlaceChild(_playerCountSlider.Root, 0f, 198f, 220f, 58f);
+        leftFilters.AddChild(_playerCountSlider.Root);
+
         _matchCountLabel = new Label
         {
             Name = "MatchCountLabel",
@@ -171,7 +196,7 @@ internal sealed class RunHistoryFilterBar
         _matchCountLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.5f));
         _matchCountLabel.AddThemeConstantOverride("shadow_offset_x", 2);
         _matchCountLabel.AddThemeConstantOverride("shadow_offset_y", 1);
-        PlaceChild(_matchCountLabel, 0f, 172f, 220f, 28f);
+        PlaceChild(_matchCountLabel, 0f, 260f, 220f, 28f);
         leftFilters.AddChild(_matchCountLabel);
 
         // --- Top-center: Run Selector dropdown ---
@@ -493,6 +518,7 @@ internal sealed class RunHistoryFilterBar
         _gameTypeDropdown?.SetSelectedText(RunFilterEngine.GetGameTypeLabel(_state.GameType));
         _sortFieldDropdown?.SetSelectedText(RunFilterEngine.GetSortFieldLabel(_state.SortBy));
         _sortDirectionDropdown?.SetSelectedText(RunFilterEngine.GetSortDirectionLabel(_state.SortDirection));
+        UpdatePlayerCountUi();
 
         HideEmptyState();
         PopulateCharacterDropdown();
@@ -763,12 +789,42 @@ internal sealed class RunHistoryFilterBar
         _characterDropdown?.SetSelectedText(selectedLabel);
     }
 
+    private void OnPlayerCountPreview(int minPlayers, int maxPlayers)
+    {
+        UpdatePlayerCountLabel(minPlayers, maxPlayers);
+    }
+
+    private void OnPlayerCountCommitted(int minPlayers, int maxPlayers)
+    {
+        _state.MinPlayerCount = minPlayers;
+        _state.MaxPlayerCount = maxPlayers;
+        UpdatePlayerCountUi();
+        RequestFilterOrSortUpdate();
+    }
+
+    private void UpdatePlayerCountUi()
+    {
+        _playerCountSlider?.SetValues(_state.MinPlayerCount, _state.MaxPlayerCount);
+        UpdatePlayerCountLabel(_state.MinPlayerCount, _state.MaxPlayerCount);
+    }
+
+    private void UpdatePlayerCountLabel(int minPlayers, int maxPlayers)
+    {
+        if (_playerCountValueLabel != null)
+        {
+            bool isFiltered = minPlayers > RunFilterState.MinPlayerCountBound || maxPlayers < RunFilterState.MaxPlayerCountCap;
+            _playerCountValueLabel.Text = RunFilterEngine.FormatPlayerCountRange(minPlayers, maxPlayers);
+            _playerCountValueLabel.AddThemeColorOverride("font_color", isFiltered ? GoldColor : MutedColor);
+        }
+    }
+
     private void ResetFiltersAndRefresh()
     {
         _state.ResetFilters();
         _outcomeDropdown?.SetSelectedText(RunFilterEngine.GetOutcomeLabel(_state.Outcome));
         _characterDropdown?.SetSelectedText("All Characters");
         _gameTypeDropdown?.SetSelectedText(RunFilterEngine.GetGameTypeLabel(_state.GameType));
+        UpdatePlayerCountUi();
         UpdateMoreFiltersButtonLabel();
         _moreFiltersPanel?.RefreshState();
         RequestFilterOrSortUpdate();

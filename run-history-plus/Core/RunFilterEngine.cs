@@ -31,7 +31,53 @@ public static class RunFilterEngine
             return false;
         }
 
+        if (!MatchesPlayerCount(run, state.MinPlayerCount, state.MaxPlayerCount))
+        {
+            return false;
+        }
+
         return true;
+    }
+
+    public static bool MatchesPlayerCount(RunSummary run, int minPlayers, int maxPlayers)
+    {
+        if (minPlayers <= RunFilterState.MinPlayerCountBound && maxPlayers >= RunFilterState.MaxPlayerCountCap)
+        {
+            return true;
+        }
+
+        if (run.PlayerCount < minPlayers)
+        {
+            return false;
+        }
+
+        if (maxPlayers < RunFilterState.MaxPlayerCountCap && run.PlayerCount > maxPlayers)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static string FormatPlayerCountRange(int minPlayers, int maxPlayers)
+    {
+        int clampedMin = Math.Clamp(minPlayers, RunFilterState.MinPlayerCountBound, RunFilterState.MaxPlayerCountCap);
+        int clampedMax = Math.Clamp(maxPlayers, clampedMin, RunFilterState.MaxPlayerCountCap);
+
+        if (clampedMin == clampedMax)
+        {
+            return clampedMin switch
+            {
+                1 => "1 player",
+                >= RunFilterState.MaxPlayerCountCap => "4+ players",
+                _ => $"{clampedMin} players"
+            };
+        }
+
+        string maxLabel = clampedMax >= RunFilterState.MaxPlayerCountCap
+            ? "4+"
+            : clampedMax.ToString(CultureInfo.InvariantCulture);
+        return $"{clampedMin}–{maxLabel} players";
     }
 
     public static bool MatchesRelics(

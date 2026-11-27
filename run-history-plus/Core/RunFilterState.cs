@@ -50,13 +50,21 @@ public enum SortDirection
 
 public sealed class RunFilterState
 {
+    public const int MinPlayerCountBound = 1;
+    public const int MaxPlayerCountCap = 4;
+
     public OutcomeFilter Outcome { get; set; } = OutcomeFilter.All;
     public string? CharacterId { get; set; }
     public GameTypeFilter GameType { get; set; } = GameTypeFilter.Any;
     public HashSet<string> RequiredRelicIds { get; } = new(StringComparer.OrdinalIgnoreCase);
     public MultiMatchMode RelicMatchMode { get; set; } = MultiMatchMode.All;
+    public int MinPlayerCount { get; set; } = MinPlayerCountBound;
+    public int MaxPlayerCount { get; set; } = MaxPlayerCountCap;
     public SortField SortBy { get; set; } = SortField.Date;
     public SortDirection SortDirection { get; set; } = SortDirection.Descending;
+
+    public bool HasPlayerCountFilter =>
+        MinPlayerCount > MinPlayerCountBound || MaxPlayerCount < MaxPlayerCountCap;
 
     public bool HasMoreFilters => RequiredRelicIds.Count > 0;
 
@@ -66,6 +74,7 @@ public sealed class RunFilterState
         Outcome != OutcomeFilter.All ||
         !string.IsNullOrEmpty(CharacterId) ||
         GameType != GameTypeFilter.Any ||
+        HasPlayerCountFilter ||
         HasMoreFilters;
 
     public bool IsDefault =>
@@ -84,6 +93,8 @@ public sealed class RunFilterState
         Outcome = OutcomeFilter.All;
         CharacterId = null;
         GameType = GameTypeFilter.Any;
+        MinPlayerCount = MinPlayerCountBound;
+        MaxPlayerCount = MaxPlayerCountCap;
         ClearMoreFilters();
     }
 

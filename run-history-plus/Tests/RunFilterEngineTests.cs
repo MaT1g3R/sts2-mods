@@ -327,16 +327,80 @@ public class RunFilterEngineTests
             Outcome = OutcomeFilter.Wins,
             CharacterId = "DEFECT",
             GameType = GameTypeFilter.Standard,
-            RelicMatchMode = MultiMatchMode.Any
+            RelicMatchMode = MultiMatchMode.Any,
+            MinPlayerCount = 2,
+            MaxPlayerCount = 3
         };
         state.RequiredRelicIds.Add("ANCHOR");
 
         state.ClearMoreFilters();
 
         Assert.False(state.HasMoreFilters);
+        Assert.True(state.HasPlayerCountFilter);
+        Assert.Equal(2, state.MinPlayerCount);
+        Assert.Equal(3, state.MaxPlayerCount);
         Assert.Equal(MultiMatchMode.All, state.RelicMatchMode);
         Assert.Equal(OutcomeFilter.Wins, state.Outcome);
         Assert.Equal("DEFECT", state.CharacterId);
         Assert.Equal(GameTypeFilter.Standard, state.GameType);
+
+        state.ResetFilters();
+        Assert.False(state.HasPlayerCountFilter);
+        Assert.Equal(RunFilterState.MinPlayerCountBound, state.MinPlayerCount);
+        Assert.Equal(RunFilterState.MaxPlayerCountCap, state.MaxPlayerCount);
+    }
+
+    [Fact]
+    public void Filters_ByPlayerCount_SupportsExactRangesAndFourPlusCap()
+    {
+        var runs = new[]
+        {
+            MakeRun("1p.run", playerCount: 1),
+            MakeRun("2p.run", playerCount: 2),
+            MakeRun("3p.run", playerCount: 3),
+            MakeRun("4p.run", playerCount: 4),
+            MakeRun("6p.run", playerCount: 6)
+        };
+
+        // Default 1-4+ includes all player counts including > 4
+        var state = new RunFilterState();
+        Assert.False(state.HasPlayerCountFilter);
+        Assert.False(state.HasActiveFilters);
+        Assert.Equal(5, RunFilterEngine.Apply(runs, state).Count);
+
+        // Solo (1-1)
+        state.MinPlayerCount = 1;
+        state.MaxPlayerCount = 1;
+        Assert.True(state.HasPlayerCountFilter);
+        Assert.True(state.HasActiveFilters);
+        Assert.Equal(0, state.ActiveMoreFilterCount);
+        Assert.Equal(new[] { "1p.run" }, RunFilterEngine.Apply(runs, state).Select(r => r.FileName));
+
+        // 2-3 players
+        state.MinPlayerCount = 2;
+        state.MaxPlayerCount = 3;
+        Assert.Equal(new[] { "3p.run", "2p.run" }, RunFilterEngine.Apply(runs, state).Select(r => r.FileName));
+
+        // Multiplayer (2-4+) includes 2, 3, 4, and modded 6p
+        state.MinPlayerCount = 2;
+        state.MaxPlayerCount = 4;
+        Assert.Equal(new[] { "6p.run", "4p.run", "3p.run", "2p.run" }, RunFilterEngine.Apply(runs, state).Select(r => r.FileName));
+
+        // 4+ (4-4) includes 4p and modded 6p
+        state.MinPlayerCount = 4;
+        state.MaxPlayerCount = 4;
+        Assert.Equal(new[] { "6p.run", "4p.run" }, RunFilterEngine.Apply(runs, state).Select(r => r.FileName));
+    }
+
+    [Theory]
+    [InlineData(1, 4, "1–4+ players")]
+    [InlineData(1, 1, "1 player")]
+    [InlineData(2, 2, "2 players")]
+    [InlineData(2, 3, "2–3 players")]
+    [InlineData(2, 4, "2–4+ players")]
+    [InlineData(4, 4, "4+ players")]
+    public void FormatPlayerCountRange_FormatsExpectedLabels(int min, int max, string expected)
+    {
+        Assert.Equal(expected, RunFilterEngine.FormatPlayerCountRange(min, max));
     }
 }

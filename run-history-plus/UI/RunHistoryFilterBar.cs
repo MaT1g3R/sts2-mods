@@ -119,7 +119,7 @@ internal sealed class RunHistoryFilterBar
         }
 
         // --- Top-left: Outcome, Character, Game Type dropdowns + match count ---
-        // Aligned to the same starting Y (88px) as the right-side Sort group.
+        // Aligned to the same starting Y (60px, matching the native Date/Time line) as the right-side Sort group.
         // Uses a plain Control with explicit positions (not VBoxContainer) so MoveChild on
         // dropdown open brings the open menu above sibling dropdowns for mouse input without
         // reordering them vertically.
@@ -130,9 +130,9 @@ internal sealed class RunHistoryFilterBar
         };
         leftFilters.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
         leftFilters.OffsetLeft = 20f;
-        leftFilters.OffsetTop = 88f;
+        leftFilters.OffsetTop = 60f;
         leftFilters.OffsetRight = 240f;
-        leftFilters.OffsetBottom = 310f;
+        leftFilters.OffsetBottom = 282f;
         _screen.AddChild(leftFilters);
 
         Label filterLabel = CreateSectionLabel("Filter", boldFont);
@@ -195,7 +195,8 @@ internal sealed class RunHistoryFilterBar
             ConfigureLazyRunSelectorDropdown();
         }
 
-        // --- Top-right: Sort & Sort Direction dropdowns (offset below top-right game version string) ---
+        // --- Top-right: Sort & Sort Direction dropdowns (aligned with the native Date/Time line) ---
+        const float rightSortWidth = 154f;
         Control rightSort = new Control
         {
             Name = "RunHistoryPlusRightSort",
@@ -203,31 +204,31 @@ internal sealed class RunHistoryFilterBar
         };
         rightSort.SetAnchorsPreset(Control.LayoutPreset.TopRight);
         rightSort.GrowHorizontal = Control.GrowDirection.Begin;
-        rightSort.OffsetLeft = -236f;
-        rightSort.OffsetTop = 88f;
+        rightSort.OffsetLeft = -16f - rightSortWidth;
+        rightSort.OffsetTop = 60f;
         rightSort.OffsetRight = -16f;
-        rightSort.OffsetBottom = 260f;
+        rightSort.OffsetBottom = 232f;
         _screen.AddChild(rightSort);
 
-        Label sortLabel = CreateSectionLabel("Sort", boldFont);
-        PlaceChild(sortLabel, 0f, 0f, 220f, 24f);
+        Label sortLabel = CreateSectionLabel("Sort", boldFont, HorizontalAlignment.Right);
+        PlaceChild(sortLabel, 0f, 0f, rightSortWidth, 24f);
         rightSort.AddChild(sortLabel);
 
-        _sortFieldDropdown = CreateDropdown("SortFieldDropdown", 220f, 40f, 36f, 260f, 19, 17);
+        _sortFieldDropdown = CreateDropdown("SortFieldDropdown", rightSortWidth, 40f, 36f, 260f, 19, 17);
         if (_sortFieldDropdown != null)
         {
-            PlaceChild(_sortFieldDropdown.Root, 0f, 28f, 220f, 40f);
+            PlaceChild(_sortFieldDropdown.Root, 0f, 28f, rightSortWidth, 40f);
             rightSort.AddChild(_sortFieldDropdown.Root);
         }
 
-        Label sortDirLabel = CreateSectionLabel("Sort Direction", boldFont);
-        PlaceChild(sortDirLabel, 0f, 78f, 220f, 24f);
+        Label sortDirLabel = CreateSectionLabel("Sort Direction", boldFont, HorizontalAlignment.Right);
+        PlaceChild(sortDirLabel, 0f, 78f, rightSortWidth, 24f);
         rightSort.AddChild(sortDirLabel);
 
-        _sortDirectionDropdown = CreateDropdown("SortDirectionDropdown", 220f, 40f, 36f, 160f, 19, 17);
+        _sortDirectionDropdown = CreateDropdown("SortDirectionDropdown", rightSortWidth, 40f, 36f, 160f, 19, 17);
         if (_sortDirectionDropdown != null)
         {
-            PlaceChild(_sortDirectionDropdown.Root, 0f, 106f, 220f, 40f);
+            PlaceChild(_sortDirectionDropdown.Root, 0f, 106f, rightSortWidth, 40f);
             rightSort.AddChild(_sortDirectionDropdown.Root);
         }
 
@@ -1102,12 +1103,12 @@ internal sealed class RunHistoryFilterBar
         control.OffsetBottom = y + height;
     }
 
-    private static Label CreateSectionLabel(string text, Font? font)
+    private static Label CreateSectionLabel(string text, Font? font, HorizontalAlignment alignment = HorizontalAlignment.Left)
     {
         Label label = new Label
         {
             Text = text,
-            HorizontalAlignment = HorizontalAlignment.Left
+            HorizontalAlignment = alignment
         };
         if (font != null) label.AddThemeFontOverride("font", font);
         label.AddThemeFontSizeOverride("font_size", 18);
